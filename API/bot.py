@@ -1,131 +1,140 @@
 import os
 import random
-from dotenv import load_dotenv
-from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
-from telegram.ext import ApplicationBuilder, CommandHandler, ContextTypes, CallbackQueryHandler
-from database import *
+from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
+from telegram.ext import ApplicationBuilder, CommandHandler, CallbackQueryHandler, ContextTypes
+from database import save_game, load_game, el_analiz_et
 
-load_dotenv()
+# Ayarlar
 TOKEN = os.getenv("BOT_TOKEN")
 
-def deste_olustur():
+def okey_olustur():
     renkler = ['Kırmızı', 'Mavi', 'Siyah', 'Sarı']
-    deste = [{'renk': r, 'sayi': s} for r in renkler for s in range(1, 14)] * 2
-    deste.extend([{'renk': 'Sahte', 'sayi': 0}] * 2)
-    random.shuffle(deste)
-    return deste
+    setler = [{'renk': r, 'sayi': s} for r in renkler for s in range(1, 14)] * 2
+    setler.append({'renk': 'Joker', 'sayi': 0})
+    setler.append({'renk': 'Joker', 'sayi': 0})
+    random.shuffle(setler)
+    return setler
 
-def el_arayuzu(el, chat_id, kaynak_idx=None):
-    db_verisi = oyun_verisi_getir(chat_id)
-    if not db_verisi: return None, "Oyun bulunamadı."
+async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    await update.message.reply_text("🀄 101 Okey Botuna Hoşgeldiniz!\n/katil yazarak masaya oturun.")
+
+async def katil(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    chat_id = update.effective_chat.id
+    user = update.effective_user
+    game = load_game(chat_id) or {'players': {}, 'current_turn_id': None, 'deck': [], 'gosterge': None, 'is_active': False}
     
-    gosterge = db_verisi[0]
-    okey = okey_belirle(gosterge)
+    if str(user.id) not in game['players']:
+        game['players'][str(user.id)] = []
+        save_game(chat_id, game)
+        await update.message.reply_text(f"✅ {user.first_name} masaya oturdu. (Oyuncu: {len(game['players'])})")
     
-    emojiler = {"Kırmızı": "🟥", "Mavi": "🟦", "Siyah": "⬛", "Sarı": "🟨", "Sahte": "🃏", "Boş": "▫️"}
+    if len(game['players']) == 1 and not game['is_active']:
+        await update.message.reply_text("Oyunun başlaması için /baslat yazın.")
+
+async def baslat(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    chat_id = update.effective_chat.id
+    game = load_game(chat_id)
+    if not game or len(game['players']) < 1: return
+
+    deck = okey_olustur()
+    game['gosterge'] = deck.pop()
+    
+    for uid in game['players']:
+        game['players'][uid] = [deck.pop() for _ in range(21)]
+    
+    game['current_turn_id'] = int(list(game['players'].keys())[0])
+    game['deck'] = deck
+    game['is_active'] = True
+    
+    save_game(chat_id, game)
+    await update.message.reply_text("🀄 Oyun başladı! Oyunculara elleri özelden gönderildi.")
+
+async def el_goster(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user_id = update.effective_user.id
+    chat_id = update.effective_chat.id
+    game = load_game(chat_id)
+    
+    if not game or str(user_id) not in game['players']: return
+    
+    markup, text = arayuz_olustur(game, user_id)
+    await update.message.reply_text(text, reply_markup=markup)
+
+def arayuz_olustur(game, user_id):
+    el = game['players'][str(user_id)]
+    per_puan = el_analiz_et(el, game['gosterge'])
+    ceza = sum(t['sayi'] for t in el if t)
+    
     keyboard = []
+    # Taş butonları (Örnek: 5'erli satırlar)
     row = []
-    
     for i, tas in enumerate(el):
-        if tas is None:
-            label = "✨" if i == kaynak_idx else emojiler["Boş"]
-        else:
-            is_okey = okey and tas['renk'] == okey['renk'] and tas['sayi'] == okey['sayi']
-            prefix = "⭐" if is_okey else emojiler.get(tas['renk'], '⚪')
-            if i == kaynak_idx: prefix = "🎯"
-            label = f"{prefix}{tas['sayi'] if tas['sayi'] != 0 else ''}"
-        
+        label = f"{tas['renk'][0]}{tas['sayi']}" if tas else "▫️"
         row.append(InlineKeyboardButton(label, callback_data=f"sec_{i}"))
-        if len(row) == 4:
+        if len(row) == 5:
             keyboard.append(row)
             row = []
     if row: keyboard.append(row)
+    
+    # Kontrol Butonları
+    keyboard.append([
+        InlineKeyboardButton("🃏 Taş Çek", callback_data="cek"),
+        InlineKeyboardButton("📤 Taş At", callback_data="at")
+    ])
+    keyboard.append([InlineKeyboardButton("▫️ Boşluk Ekle", callback_data="bosluk")])
+    
+    status = "🔴 SIRA SENDE DEĞİL"
+    if game['current_turn_id'] == user_id:
+        status = "🟢 SIRA SENDE!"
 
-    keyboard.append([InlineKeyboardButton("▫️ Boşluk", callback_data="bosluk"), InlineKeyboardButton("❌ Temizle", callback_data="temizle")])
-    keyboard.append([InlineKeyboardButton("🃏 Taş Çek", callback_data="cek"), InlineKeyboardButton("📤 Taş At", callback_data="at")])
-    
-    per_puan = el_analiz_et(el, okey)
-    ceza = ceza_hesapla(el)
-    txt = f"📍 Okey: {okey['renk']} {okey['sayi']}\n💠 **Per Toplamı:** {per_puan}\n⚠️ **Ceza Puanı:** {ceza}"
-    if per_puan >= 101: txt += "\n✅ **ELİN AÇIYOR!**"
-    
-    return InlineKeyboardMarkup(keyboard), txt
-
-async def katil(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    user = update.effective_user
-    chat_id = update.effective_chat.id
-    
-    # Test için tek kişiyle oyunu başlatıyoruz
-    deste = deste_olustur()
-    gosterge = deste.pop()
-    oyuncular = [{'id': user.id, 'name': user.first_name, 'hand': [deste.pop() for _ in range(21)]}]
-    
-    oyunu_baslat_db(chat_id, oyuncular, deste, gosterge)
-    markup, txt = el_arayuzu(oyuncular[0]['hand'], chat_id)
-    await update.message.reply_text(f"🚀 Oyun Başladı!\n{txt}", reply_markup=markup)
+    text = f"{status}\n💠 Per: {per_puan} | ⚠️ Ceza: {ceza}\n🃏 Gösterge: {game['gosterge']['renk']} {game['gosterge']['sayi']}"
+    return InlineKeyboardMarkup(keyboard), text
 
 async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
-    await query.answer()
-    uid = query.from_user.id
-    cid = query.message.chat_id
+    user_id = query.from_user.id
+    chat_id = query.message.chat_id
+    game = load_game(chat_id)
     
-    el = oyuncu_eli_getir(cid, uid)
-    sira = sira_kimde(cid)
-
-    # --- TAŞ SEÇME VE DÜZENLEME ---
-    if query.data.startswith("sec_"):
-        idx = int(query.data.split("_")[1])
-        k_idx = context.user_data.get('k_idx')
-        if k_idx is None:
-            context.user_data['k_idx'] = idx
-        else:
-            el[k_idx], el[idx] = el[idx], el[k_idx]
-            oyuncu_eli_guncelle(cid, uid, el)
-            context.user_data['k_idx'] = None
-
-    elif query.data == "bosluk":
-        el.append(None)
-        oyuncu_eli_guncelle(cid, uid, el)
-
-    elif query.data == "temizle":
-        el = [t for t in el if t is not None]
-        oyuncu_eli_guncelle(cid, uid, el)
-
-    # --- SIRA GEREKTİREN İŞLEMLER ---
-    elif query.data == "cek":
-        if sira != uid:
-            await context.bot.send_message(cid, "⚠️ Sıra sende değil!")
-            return
-        if len(el) >= 22:
-            await context.bot.send_message(cid, "⚠️ Zaten çektin veya 22 taşın var!")
-            return
-        cekilen, yeni_el = tas_cek_db(cid, uid)
-        if cekilen:
-            el = yeni_el
-
-    elif query.data == "at":
-        if sira != uid:
-            await context.bot.send_message(cid, "⚠️ Sıra sende değil!")
-            return
-        k_idx = context.user_data.get('k_idx')
-        if k_idx is None or k_idx >= len(el) or el[k_idx] is None:
-            await context.bot.send_message(cid, "⚠️ Önce bir taş seç (🎯)!")
+    if query.data == "cek":
+        # 1. Sıra Kontrolü
+        if game['current_turn_id'] != user_id:
+            await query.answer("Sıra sende değil!", show_alert=True)
             return
         
-        el.pop(k_idx)
-        temiz_el = [t for t in el if t is not None]
-        oyuncu_eli_guncelle(cid, uid, temiz_el)
-        context.user_data['k_idx'] = None
-        sirayi_degistir(cid)
+        # 2. Taş Sınırı Kontrolü
+        el = game['players'][str(user_id)]
+        mevcut_tas = len([t for t in el if t is not None])
+        if mevcut_tas >= 22:
+            await query.answer("Elin dolu (22 taş)! Önce taş atmalısın.", show_alert=True)
+            return
+            
+        yeni_tas = game['deck'].pop()
+        game['players'][str(user_id)].append(yeni_tas)
+        save_game(chat_id, game)
+        
+    elif query.data == "at":
+        if game['current_turn_id'] != user_id:
+            await query.answer("Sıra sende değil!", show_alert=True)
+            return
+            
+        # Basitçe son taşı atma ve sırayı geçirme mantığı
+        game['players'][str(user_id)].pop() # Örnek: Son taşı atar
+        p_ids = list(game['players'].keys())
+        idx = (p_ids.index(str(user_id)) + 1) % len(p_ids)
+        game['current_turn_id'] = int(p_ids[idx])
+        save_game(chat_id, game)
+        await query.message.edit_text("Taş attın, sıra geçti!")
+        return
 
-    # Arayüzü Güncelle
-    markup, txt = el_arayuzu(oyuncu_eli_getir(cid, uid), cid, context.user_data.get('k_idx'))
-    await query.edit_message_text(text=txt, reply_markup=markup)
+    # Arayüzü tazele
+    markup, text = arayuz_olustur(game, user_id)
+    await query.edit_message_text(text, reply_markup=markup)
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     app = ApplicationBuilder().token(TOKEN).build()
+    app.add_handler(CommandHandler("start", start))
     app.add_handler(CommandHandler("katil", katil))
+    app.add_handler(CommandHandler("baslat", baslat))
+    app.add_handler(CommandHandler("el", el_goster))
     app.add_handler(CallbackQueryHandler(button_handler))
-    print("Bot çalışıyor...")
     app.run_polling()
