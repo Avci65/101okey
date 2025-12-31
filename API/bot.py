@@ -26,7 +26,7 @@ def index():
 
 def run_flask():
     # Railway'in atadığı portu kullanıyoruz
-    port = int(os.environ.get("PORT", 5000))
+    port = int(os.environ.get("PORT", 8080))
     flask_app.run(host='0.0.0.0', port=port)
 
 # --- OKEY MANTIĞI ---
