@@ -17,7 +17,8 @@ load_dotenv()
 TOKEN = "8238405925:AAGajI_nktIukiRlivYWIEhYlEZp8g-Aas8"
 
 # --- WEB PANEL (FLASK) AYARLARI ---
-flask_app = Flask(__name__)
+# bot.py içindeki Flask satırını tam olarak böyle değiştir:
+flask_app = Flask(__name__, template_folder='templates')
 
 @flask_app.route('/')
 def index():
