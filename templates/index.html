@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <style>
+        body { background: #0f2027; color: white; font-family: sans-serif; margin: 0; padding: 0; display: flex; flex-direction: column; align-items: center; height: 100vh; overflow: hidden; }
+        .header { background: rgba(0,0,0,0.5); width: 100%; padding: 10px; text-align: center; font-weight: bold; color: #4ca1af; border-bottom: 1px solid #333; }
+        .istaka-container { flex-grow: 1; display: flex; align-items: flex-end; width: 100%; padding-bottom: 40px; justify-content: center; }
+        .istaka { background: #2c3e50; width: 95%; height: 160px; border-radius: 10px; display: grid; grid-template-columns: repeat(11, 1fr); grid-template-rows: repeat(2, 1fr); gap: 5px; padding: 10px; box-shadow: 0 10px 30px rgba(0,0,0,0.8); border: 2px solid #34495e; }
+        .tas { background: #fdfdfd; color: #333; border-radius: 4px; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 1.2rem; box-shadow: 0 4px #bdc3c7; height: 100%; position: relative; }
+        .tas.mavi { color: #2980b9; } .tas.kirmizi { color: #c0392b; } .tas.siyah { color: #2c3e50; } .tas.sari { color: #f1c40f; }
+        .controls { width: 100%; display: flex; justify-content: space-around; padding: 15px; background: #1c1c1c; }
+        button { background: #4ca1af; border: none; color: white; padding: 10px 20px; border-radius: 5px; font-weight: bold; }
+    </style>
+</head>
+<body>
+    <div class="header">🎴 101 OKEY PLUS - OYUN EKRANI</div>
+    
+    <div class="istaka-container">
+        <div class="istaka" id="istaka">
+            </div>
+    </div>
+
+    <div class="controls">
+        <button onclick="window.location.reload()">🔄 Yenile</button>
+        <button onclick="Telegram.WebApp.close()">❌ Kapat</button>
+    </div>
+
+    <script>
+        const tg = window.Telegram.WebApp;
+        tg.ready();
+        tg.expand(); // Ekranı tam boy yapar
+
+        // Örnek taş dizisi (Daha sonra bot.py'den çekilecek)
+        const ornekEl = [
+            {sayi: 1, renk: 'kirmizi'}, {sayi: 2, renk: 'kirmizi'}, {sayi: 3, renk: 'kirmizi'},
+            {sayi: 10, renk: 'mavi'}, {sayi: 10, renk: 'siyah'}, {sayi: 10, renk: 'sari'},
+            {sayi: 13, renk: 'siyah'}, {sayi: null, renk: 'bos'}, {sayi: 5, renk: 'mavi'}
+        ];
+
+        const istakaDiv = document.getElementById('istaka');
+        ornekEl.forEach(tas => {
+            const div = document.createElement('div');
+            div.className = `tas ${tas.renk}`;
+            div.innerText = tas.sayi || '';
+            istakaDiv.appendChild(div);
+        });
+    </script>
+</body>
+</html>
