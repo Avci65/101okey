@@ -64,6 +64,21 @@
     <div class="istaka-container">
         <div class="istaka" id="istaka"></div>
     </div>
+<div id="puanBox" style="
+    position: fixed;
+    bottom: 85px;
+    left: 15px;
+    background: rgba(0,0,0,0.8);
+    padding: 8px 15px;
+    border-radius: 15px;
+    border: 1px solid gold;
+    color: gold;
+    font-weight: bold;
+    font-size: 14px;
+    display: none;
+">
+    Per Toplamı: <span id="perPuani">0</span>
+</div>
 
     <div class="controls">
         <button onclick="otomatikDiz()" style="background:#f39c12">🪄 DİZ</button>
@@ -126,6 +141,7 @@ async function otomatikDiz() {
     if (data.success) {
         mevcutEl = data.yeni_el;
         arayuzuGuncelle();
+        perPuaniniHesapla();
     }
 }
 
@@ -158,10 +174,60 @@ function arayuzuGuncelle() {
         };
         istaka.appendChild(d);
     });
+function perPuaniniHesapla() {
+    let toplam = 0;
+    let geciciPer = [];
+
+    for (let i = 0; i < mevcutEl.length; i++) {
+        const tas = mevcutEl[i];
+
+        if (tas !== null) {
+            geciciPer.push(tas);
+        } else {
+            if (perGecerliMi(geciciPer)) {
+                toplam += geciciPer.reduce((s, t) => s + t.sayi, 0);
+            }
+            geciciPer = [];
+        }
+    }
+
+    // Sondaki per
+    if (perGecerliMi(geciciPer)) {
+        toplam += geciciPer.reduce((s, t) => s + t.sayi, 0);
+    }
+
+    const box = document.getElementById("puanBox");
+    const span = document.getElementById("perPuani");
+
+    span.innerText = toplam;
+
+    box.style.display = toplam > 0 ? "block" : "none";
+}
+}
+function perGecerliMi(grup) {
+    if (grup.length < 3) return false;
+
+    // Seri per
+    const ayniRenk = grup.every(t => t.renk === grup[0].renk);
+    const ardisik = grup.every((t, i) =>
+        i === 0 || t.sayi === grup[i - 1].sayi + 1
+    );
+    if (ayniRenk && ardisik) return true;
+
+    // Grup per
+    const ayniSayi = grup.every(t => t.sayi === grup[0].sayi);
+    const farkliRenk = new Set(grup.map(t => t.renk)).size === grup.length;
+    if (ayniSayi && farkliRenk) return true;
+
+    return false;
 }
 
+
+
 /* ================= BAŞLAT ================= */
-window.onload = taslariYukle;
+window.onload = () => {
+    taslariYukle().then(perPuaniniHesapla);
+};
 </script>
 </body>
 </html>
