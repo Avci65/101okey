@@ -12,22 +12,24 @@ from database import (
     oyuncu_eli_getir, oyuncu_eli_guncelle, tas_cek_db, 
     okey_belirle, oyun_verisi_getir, el_analiz_et
 )
-# --- FLASK AYARLARI ---
-# Dosyanın bulunduğu klasörü (API) ve bir üstündeki templates klasörünü buluyoruz
-current_dir = os.path.dirname(os.path.abspath(__file__))
-# templates klasörü API klasörü ile aynı seviyedeyse:
-template_path = os.path.join(os.path.dirname(current_dir), 'templates')
 
-flask_app = Flask(__name__, template_folder=template_path)
 load_dotenv()
 TOKEN = "8238405925:AAG8ak1cXItdGW4e5RAK4NXGxX8lXeQBWDs"
+
+# --- FLASK DOSYA YOLU AYARI ---
+# templates klasörü API'nin dışında, ana dizinde olduğu için yolu dinamik buluyoruz
+current_dir = os.path.dirname(os.path.abspath(__file__)) # /app/API
+root_dir = os.path.dirname(current_dir) # /app
+template_path = os.path.join(root_dir, 'templates')
+
+flask_app = Flask(__name__, template_folder=template_path)
 
 # --- YARDIMCI FONKSİYONLAR ---
 
 def renk_normalize_et(tas):
     if not tas:
         return None
-    renk = tas.get('renk', '').lower()
+    renk = str(tas.get('renk', '')).lower()
     if 'kirmizi' in renk or 'kırmızı' in renk or 'red' in renk:
         tas['renk'] = 'kirmizi'
     elif 'mavi' in renk or 'blue' in renk:
@@ -39,7 +41,7 @@ def renk_normalize_et(tas):
     return tas
 
 def per_analiz_et_mantigi(taslar):
-    """Eldeki en iyi per kombinasyonlarını bulur ve aralarına boşluk ekler."""
+    """En yüksek puanlı per kombinasyonlarını bulur ve aralarına boşluk ekler."""
     renkler = {}
     sayilar = {}
     for t in taslar:
@@ -86,9 +88,10 @@ def per_analiz_et_mantigi(taslar):
     toplam_puan = 0
     for per in final_dizilim:
         sonuc_istaka.extend(per)
-        sonuc_istaka.append(None) # Perler arası boşluk bırak
+        sonuc_istaka.append(None) # Perler arası boşluk ekleme
         toplam_puan += sum(t['sayi'] for t in per)
 
+    # Kalan taşları sona ekle
     kalanlar = [t for t in taslar if f"{t['renk']}-{t['sayi']}" not in kullanilan_taslar]
     sonuc_istaka.extend(kalanlar)
     
@@ -104,8 +107,7 @@ def deste_olustur():
     random.shuffle(deste)
     return deste
 
-# --- FLASK AYARLARI ---
-flask_app = Flask(__name__)
+# --- FLASK ROTALARI ---
 
 @flask_app.route('/')
 def index():
@@ -117,9 +119,12 @@ def get_hand():
     chat_id = request.args.get('chat_id')
     if not user_id or user_id == 'undefined' or not chat_id:
         return jsonify({"error": "Eksik parametre"}), 400
-    el = oyuncu_eli_getir(int(chat_id), int(user_id))
-    normalize_el = [renk_normalize_et(t) for t in el] if el else []
-    return jsonify(normalize_el)
+    try:
+        el = oyuncu_eli_getir(int(chat_id), int(user_id))
+        normalize_el = [renk_normalize_et(tas) for tas in el] if el else []
+        return jsonify(normalize_el)
+    except Exception:
+        return jsonify([])
 
 @flask_app.route('/save_hand', methods=['POST'])
 def save_hand():
@@ -131,20 +136,26 @@ def save_hand():
 @flask_app.route('/auto_sort', methods=['POST'])
 def auto_sort():
     data = request.json
-    el = oyuncu_eli_getir(int(data['chat_id']), int(data['user_id']))
-    taslar = [t for t in el if t is not None]
-    yeni_el, puan = per_analiz_et_mantigi(taslar)
-    oyuncu_eli_guncelle(int(data['chat_id']), int(data['user_id']), yeni_el)
-    return jsonify({"success": True, "yeni_el": yeni_el, "puan": puan})
+    try:
+        el = oyuncu_eli_getir(int(data['chat_id']), int(data['user_id']))
+        taslar = [t for t in el if t is not None]
+        # Akıllı per analizi ve puan hesaplama
+        yeni_el, puan = per_analiz_et_mantigi(taslar)
+        oyuncu_eli_guncelle(int(data['chat_id']), int(data['user_id']), yeni_el)
+        return jsonify({"success": True, "yeni_el": yeni_el, "puan": puan})
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)})
 
 def run_flask():
-    flask_app.run(host='0.0.0.0', port=int(os.environ.get("PORT", 8080)))
+    port = int(os.environ.get("PORT", 8080))
+    flask_app.run(host='0.0.0.0', port=port)
 
 # --- BOT KOMUTLARI ---
+
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     webapp_url = "https://worker-production-9405.up.railway.app"
     keyboard = [[InlineKeyboardButton("🎴 Oyun Panelini Aç", web_app=WebAppInfo(url=webapp_url))]]
-    await update.message.reply_text("🚀 101 Okey Plus Paneli Aktif!", reply_markup=InlineKeyboardMarkup(keyboard))
+    await update.message.reply_text("🚀 101 Okey Plus Paneline Hoş Geldin!", reply_markup=InlineKeyboardMarkup(keyboard))
 
 async def katil(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user, chat_id = update.effective_user, update.effective_chat.id
@@ -154,7 +165,7 @@ async def katil(update: Update, context: ContextTypes.DEFAULT_TYPE):
     oyuncular = [{'id': user.id, 'name': user.first_name, 'hand': hand}]
     try:
         oyunu_baslat_db(chat_id, oyuncular, deste, gosterge)
-        await update.message.reply_text(f"✅ {user.first_name}, oyun başlatıldı! Panelden 'Yenile' yapabilirsin.")
+        await update.message.reply_text(f"✅ {user.first_name}, oyun başlatıldı!")
     except Exception as e:
         await update.message.reply_text("❌ Hata oluştu.")
 
