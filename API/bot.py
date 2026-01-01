@@ -40,10 +40,31 @@ def renk_normalize_et(tas):
         tas['renk'] = 'siyah'
     return tas
 
+def per_gecerli_mi(grup):
+    """Bir taş grubunun 101 kurallarına göre per olup olmadığını denetler."""
+    if len(grup) < 3: 
+        return False
+    
+    # 1. Seri Per Kontrolü (Aynı renk, ardışık sayılar: örn. Mavi 1-2-3)
+    is_seri = all(t['renk'] == grup[0]['renk'] for t in grup) and \
+              all(grup[i]['sayi'] == grup[i-1]['sayi'] + 1 for i in range(1, len(grup)))
+    
+    if is_seri:
+        return True
+
+    # 2. Grup Per Kontrolü (Aynı sayı, farklı renkler: örn. Siyah 5 - Mavi 5 - Kırmızı 5)
+    renkler = [t['renk'] for t in grup]
+    is_grup = all(t['sayi'] == grup[0]['sayi'] for t in grup) and \
+              len(set(renkler)) == len(renkler)
+              
+    return is_grup
+
 def per_analiz_et_mantigi(taslar):
-    """En yüksek puanlı per kombinasyonlarını bulur ve aralarına boşluk ekler."""
+    """Taşları en yüksek puanı alacak şekilde dizer ve puanı hesaplar."""
     renkler = {}
     sayilar = {}
+    
+    # Taşları renklerine ve sayılarına göre gruplandır
     for t in taslar:
         r, s = t['renk'], t['sayi']
         if r not in renkler: renkler[r] = []
@@ -52,9 +73,9 @@ def per_analiz_et_mantigi(taslar):
         sayilar[s].append(t)
 
     final_dizilim = []
-    kullanilan_taslar = set()
+    kullanilan_tas_keyleri = set()
 
-    # 1. Seri Perleri Bul (Örn: Mavi 1-2-3)
+    # ÖNCE SERİ PERLERİ BUL (Genelde daha çok puan getirir)
     for r in renkler:
         liste = sorted(renkler[r], key=lambda x: x['sayi'])
         gecici_per = []
@@ -64,37 +85,44 @@ def per_analiz_et_mantigi(taslar):
             else:
                 if len(gecici_per) >= 3:
                     final_dizilim.append(list(gecici_per))
-                    for p in gecici_per: kullanilan_taslar.add(f"{p['renk']}-{p['sayi']}")
+                    for p in gecici_per: kullanilan_tas_keyleri.add(f"{p['renk']}-{p['sayi']}")
                 gecici_per = [liste[i]]
         if len(gecici_per) >= 3:
             final_dizilim.append(list(gecici_per))
-            for p in gecici_per: kullanilan_taslar.add(f"{p['renk']}-{p['sayi']}")
+            for p in gecici_per: kullanilan_tas_keyleri.add(f"{p['renk']}-{p['sayi']}")
 
-    # 2. Grup Perleri Bul (Örn: Siyah 5 - Mavi 5 - Kırmızı 5)
+    # SONRA GRUP PERLERİ BUL (Kullanılmayan taşlardan)
     for s in sayilar:
         liste = sayilar[s]
-        benzersiz_renkler = []
+        benzersiz_grup = []
         gorulen_renkler = set()
         for t in liste:
             key = f"{t['renk']}-{t['sayi']}"
-            if t['renk'] not in gorulen_renkler and key not in kullanilan_taslar:
-                benzersiz_renkler.append(t)
+            if t['renk'] not in gorulen_renkler and key not in kullanilan_tas_keyleri:
+                benzersiz_grup.append(t)
                 gorulen_renkler.add(t['renk'])
-        if len(benzersiz_renkler) >= 3:
-            final_dizilim.append(benzersiz_renkler)
-            for p in benzersiz_renkler: kullanilan_taslar.add(f"{p['renk']}-{p['sayi']}")
+        
+        if len(benzersiz_grup) >= 3:
+            final_dizilim.append(benzersiz_grup)
+            for p in benzersiz_grup: kullanilan_tas_keyleri.add(f"{p['renk']}-{p['sayi']}")
 
+    # ISTAKAYI OLUŞTUR VE PUANI HESAPLA
     sonuc_istaka = []
     toplam_puan = 0
+    
     for per in final_dizilim:
+        # Sadece kurallara uyan perlerin puanını topla
+        if per_gecerli_mi(per):
+            toplam_puan += sum(t['sayi'] for t in per)
+        
         sonuc_istaka.extend(per)
-        sonuc_istaka.append(None) # Perler arası boşluk ekleme
-        toplam_puan += sum(t['sayi'] for t in per)
+        sonuc_istaka.append(None) # Her perden sonra boşluk bırak
 
-    # Kalan taşları sona ekle
-    kalanlar = [t for t in taslar if f"{t['renk']}-{t['sayi']}" not in kullanilan_taslar]
+    # PER OLMAYAN TAŞLARI SONA EKLE
+    kalanlar = [t for t in taslar if f"{t['renk']}-{t['sayi']}" not in kullanilan_tas_keyleri]
     sonuc_istaka.extend(kalanlar)
     
+    # 30 SLOTLUK ISTAKAYA TAMAMLA
     while len(sonuc_istaka) < 30:
         sonuc_istaka.append(None)
         

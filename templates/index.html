@@ -111,6 +111,7 @@
     }
 
     document.getElementById('perPuani').innerText = toplam;
+
 }
 
         async function taslariYukle() {
@@ -127,6 +128,42 @@
                 arayuzuGuncelle();
             } catch (e) { console.error("Hata:", e); }
         }
+        function perGecerliMi(grup) {
+    if (grup.length < 3) return false;
+
+    // Seri Kontrolü (Aynı renk, ardışık sayı)
+    const ayniRenk = grup.every(t => t.renk === grup[0].renk);
+    const ardisik = grup.every((t, i) => i === 0 || t.sayi === grup[i-1].sayi + 1);
+    if (ayniRenk && ardisik) return true;
+
+    // Grup Kontrolü (Aynı sayı, farklı renk)
+    const ayniSayi = grup.every(t => t.sayi === grup[0].sayi);
+    const farkliRenk = new Set(grup.map(t => t.renk)).size === grup.length;
+    if (ayniSayi && farkliRenk) return true;
+
+    return false;
+}
+
+function manuelPuanHesapla() {
+    let toplam = 0;
+    let geciciPer = [];
+
+    for (let i = 0; i < mevcutEl.length; i++) {
+        const tas = mevcutEl[i];
+        if (tas !== null) {
+            geciciPer.push(tas);
+        } else {
+            if (perGecerliMi(geciciPer)) { // Sadece kurala uyuyorsa topla
+                toplam += geciciPer.reduce((sum, t) => sum + t.sayi, 0);
+            }
+            geciciPer = [];
+        }
+    }
+    if (perGecerliMi(geciciPer)) {
+        toplam += geciciPer.reduce((sum, t) => sum + t.sayi, 0);
+    }
+    document.getElementById('perPuani').innerText = toplam;
+}
 
         async function otomatikDiz() {
             const user = tg.initDataUnsafe.user;
