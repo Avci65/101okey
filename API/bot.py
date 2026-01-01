@@ -117,11 +117,17 @@ def per_analiz_et_mantigi(taslar):
     return sonuc_istaka[:30], toplam_puan
 
 def deste_olustur():
-    renkler = ['Kırmızı', 'Mavi', 'Siyah', 'Sarı']
+    renkler = ['kirmizi', 'mavi', 'siyah', 'sari']
     deste = [{'renk': r, 'sayi': s} for r in renkler for s in range(1, 14)] * 2
-    deste.extend([{'renk': 'Sahte', 'sayi': 0}] * 2)
+    deste.extend([{'renk': 'sahte', 'sayi': 0}] * 2)
     random.shuffle(deste)
     return deste
+def oyuncu_daha_once_acti_mi(chat_id, user_id):
+    oyun = oyun_verisi_getir(chat_id)
+    if not oyun:
+        return False
+    return user_id in oyun.get("acmis_oyuncular", [])
+
 
 # --- FLASK ROTALARI ---
 @flask_app.route('/draw_tile', methods=['POST'])
@@ -182,6 +188,28 @@ def auto_sort():
         "yeni_el": yeni_el,
         "puan": puan
     })
+@flask_app.route('/can_open', methods=['POST'])
+def can_open():
+    data = request.json
+    chat_id = int(data['chat_id'])
+    user_id = int(data['user_id'])
+
+    # Daha önce açtıysa tekrar kontrol gerekmez
+    if oyuncu_daha_once_acti_mi(chat_id, user_id):
+        return jsonify({"can_open": True, "puan": 0})
+
+    el = oyuncu_eli_getir(chat_id, user_id)
+    if not el:
+        return jsonify({"can_open": False, "puan": 0})
+
+    taslar = [t for t in el if t is not None]
+    _, puan = per_analiz_et_mantigi(taslar)
+
+    return jsonify({
+        "can_open": puan >= 101,
+        "puan": puan
+    })
+
 
 
 def run_flask():

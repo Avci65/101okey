@@ -79,6 +79,15 @@
 ">
     Per Toplamı: <span id="perPuani">0</span>
 </div>
+<div id="openStatus" style="
+    position: fixed;
+    bottom: 50px;
+    left: 15px;
+    font-size: 13px;
+    font-weight: bold;
+">
+</div>
+
 
     <div class="controls">
         <button onclick="otomatikDiz()" style="background:#f39c12">🪄 DİZ</button>
@@ -163,6 +172,27 @@ function perPuaniniHesapla() {
     document.getElementById("puanBox").style.display =
         toplam > 0 ? "block" : "none";
 }
+async function acabilirMiKontrolEt() {
+    const res = await fetch('/can_open', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({
+            user_id: user.id,
+            chat_id: chat_id
+        })
+    });
+
+    const data = await res.json();
+    const statusDiv = document.getElementById("openStatus");
+
+    if (data.can_open) {
+        statusDiv.innerText = "✅ El açabilirsin (101+)";
+        statusDiv.style.color = "lightgreen";
+    } else {
+        statusDiv.innerText = `❌ Açmak için ${101 - data.puan} puan daha gerekli`;
+        statusDiv.style.color = "#ff7675";
+    }
+}
 
 /* ================= VERİ ÇEK ================= */
 async function taslariYukle() {
@@ -192,6 +222,7 @@ async function otomatikDiz() {
         mevcutEl = data.yeni_el;
         arayuzuGuncelle();
         perPuaniniHesapla();
+        acabilirMiKontrolEt();
     }
 }
 
@@ -232,7 +263,12 @@ function arayuzuGuncelle() {
 }
 
 /* ================= BAŞLAT ================= */
-window.onload = taslariYukle;
+window.onload = async () => {
+    await taslariYukle();
+    perPuaniniHesapla();
+    acabilirMiKontrolEt();
+};
+
 </script>
 
 </body>
