@@ -333,7 +333,8 @@ async def katil(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 if __name__ == '__main__':
     threading.Thread(target=run_flask, daemon=True).start()
-    app = ApplicationBuilder().token(TOKEN).build()
-    app.add_handler(CommandHandler("start", start))
-    app.add_handler(CommandHandler("katil", katil))
-    app.run_polling()
+    if os.getenv("RUN_TELEGRAM_BOT", "true") == "true":
+      app = ApplicationBuilder().token(TOKEN).build()
+      app.add_handler(CommandHandler("start", start))
+      app.add_handler(CommandHandler("katil", katil))
+      app.run_polling()
