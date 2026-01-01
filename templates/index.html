@@ -1,65 +1,64 @@
 <!DOCTYPE html>
-<html>
+<html lang="tr">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <style>
-        body { background: #1a1a1a; color: white; font-family: sans-serif; display: flex; flex-direction: column; align-items: center; height: 100vh; margin: 0; }
-        .istaka { background: #2c3e50; width: 95%; height: 140px; border-radius: 10px; display: grid; grid-template-columns: repeat(11, 1fr); gap: 5px; padding: 10px; border: 2px solid #34495e; }
-        .tas { background: #fdfdfd; color: #333; border-radius: 4px; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 1.2rem; height: 50px; }
-        .kirmizi { color: #c0392b; } .mavi { color: #2980b9; } .siyah { color: #2c3e50; } .sari { color: #f1c40f; }
-        .controls { margin-top: 20px; display: flex; gap: 10px; }
-        button { background: #4ca1af; border: none; color: white; padding: 10px 20px; border-radius: 5px; font-weight: bold; }
+        body { background: #0f2027; color: white; font-family: sans-serif; margin: 0; display: flex; flex-direction: column; align-items: center; height: 100vh; overflow: hidden; }
+        .header { background: rgba(0,0,0,0.5); width: 100%; padding: 15px; text-align: center; font-weight: bold; color: #4ca1af; border-bottom: 1px solid #333; }
+        .istaka-container { flex-grow: 1; display: flex; align-items: center; justify-content: center; width: 100%; }
+        .istaka { background: #2c3e50; width: 90%; min-height: 120px; border-radius: 12px; display: grid; grid-template-columns: repeat(11, 1fr); gap: 6px; padding: 12px; box-shadow: 0 10px 25px rgba(0,0,0,0.5); border: 2px solid #34495e; }
+        .tas { background: #fdfdfd; color: #333; border-radius: 4px; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 1.1rem; height: 50px; box-shadow: 0 3px #bdc3c7; }
+        .kirmizi { color: #c0392b; } .mavi { color: #2980b9; } .siyah { color: #2c3e50; } .sari { color: #f1c40f; } .bos { opacity: 0.3; background: transparent; box-shadow: none; border: 1px dashed #555; }
+        .controls { width: 100%; display: flex; justify-content: center; gap: 20px; padding: 20px; background: #1c1c1c; }
+        button { background: #4ca1af; border: none; color: white; padding: 12px 24px; border-radius: 8px; font-weight: bold; cursor: pointer; }
     </style>
 </head>
 <body>
-    <h3 style="color: #4ca1af;">🎴AVCİ 101 OKEY </h3>
-    <div class="istaka" id="istaka">
-        </div>
+    <div class="header">🎴 AVCİ 101 OKEY </div>
+    <div class="istaka-container">
+        <div class="istaka" id="istaka">
+            </div>
+    </div>
     <div class="controls">
-        <button onclick="eliYukle()">🔄 Yenile</button>
-        <button onclick="tg.close()">❌ Kapat</button>
+        <button onclick="taslariYukle()">🔄 Yenile</button>
+        <button onclick="window.Telegram.WebApp.close()" style="background:#c0392b">❌ Kapat</button>
     </div>
 
     <script>
-    const tg = window.Telegram.WebApp;
-    tg.ready();
-    tg.expand();
+        const tg = window.Telegram.WebApp;
+        tg.ready();
+        tg.expand();
 
-    async function taslariDiz() {
-        const istakaDiv = document.getElementById('istaka');
-        // Telegram'dan gelen kullanıcı bilgilerini alıyoruz
-        const user = tg.initDataUnsafe.user;
-        const chat_id = tg.initDataUnsafe.chat_instance;
+        async function taslariYukle() {
+            const user = tg.initDataUnsafe.user;
+            // chat_id undefined gelirse user.id'yi yedek kullan
+            const chat_id = tg.initDataUnsafe.chat_instance || (user ? user.id.toString() : '0');
+            const istakaDiv = document.getElementById('istaka');
 
-        if (!user) {
-            istakaDiv.innerHTML = '<p>Telegram verisi alınamadı!</p>';
-            return;
+            if (!user) {
+                istakaDiv.innerHTML = '<p style="grid-column: span 11">Kullanıcı verisi yok!</p>';
+                return;
+            }
+
+            try {
+                const response = await fetch(`/get_hand?user_id=${user.id}&chat_id=${chat_id}`);
+                if (!response.ok) throw new Error();
+                const el = await response.json();
+                
+                istakaDiv.innerHTML = '';
+                el.forEach(tas => {
+                    const div = document.createElement('div');
+                    div.className = `tas ${tas ? tas.renk.toLowerCase() : 'bos'}`;
+                    div.innerText = tas ? tas.sayi : '▫️';
+                    istakaDiv.appendChild(div);
+                });
+            } catch (e) {
+                istakaDiv.innerHTML = '<p style="grid-column: span 11">Taşlar yüklenemedi!</p>';
+            }
         }
-
-        try {
-            // Sunucudaki API'den veriyi istiyoruz
-            const response = await fetch(`/get_hand?user_id=${user.id}&chat_id=${chat_id}`);
-            const el = await response.json();
-
-            istakaDiv.innerHTML = ''; // Eski içeriği temizle
-            
-            el.forEach(tas => {
-                const div = document.createElement('div');
-                // Taş varsa renk sınıfını ekle, yoksa boş slot yap
-                div.className = `tas ${tas ? tas.renk.toLowerCase() : 'bos'}`;
-                div.innerText = tas ? tas.sayi : '▫️';
-                istakaDiv.appendChild(div);
-            });
-        } catch (error) {
-            console.error("Hata:", error);
-            istakaDiv.innerHTML = '<p>Taşlar yüklenemedi!</p>';
-        }
-    }
-
-    // Sayfa açıldığında veriyi çek
-    window.onload = taslariDiz;
-</script>
+        window.onload = taslariYukle;
+    </script>
 </body>
 </html>
