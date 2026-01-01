@@ -126,6 +126,12 @@ def oyuncu_daha_once_acti_mi(chat_id, user_id):
     oyun = oyun_verisi_getir(chat_id)
     if not oyun:
         return False
+
+    # oyun tuple geliyorsa → henüz açma takibi yok
+    if isinstance(oyun, tuple):
+        return False
+
+    # dict ise (ileride eklenecek)
     return user_id in oyun.get("acmis_oyuncular", [])
 
 
