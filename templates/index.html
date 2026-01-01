@@ -56,70 +56,100 @@
         <button onclick="window.Telegram.WebApp.close()" style="background:#c0392b">❌ Kapat</button>
     </div>
 
-    <script>
-        const tg = window.Telegram.WebApp;
-        tg.ready();
-        tg.expand();
+   <script>
+    // Telegram WebApp nesnesini başlatıyoruz
+    const tg = window.Telegram.WebApp;
+    tg.ready();
+    tg.expand(); // Uygulamayı tam ekran yapıyoruz
 
-        let mevcutEl = [];
-        let suruklenenIdx = null;
+    let mevcutEl = [];
+    let suruklenenIdx = null;
 
-        async function taslariYukle() {
-            const user = tg.initDataUnsafe.user;
-            const chat_id = tg.initDataUnsafe.chat_instance || user.id.toString();
+    // 1. Veritabanından Eli Çeken Ana Fonksiyon
+    async function taslariYukle() {
+        const user = tg.initDataUnsafe.user;
+        // chat_instance undefined gelirse yedek olarak user.id kullanıyoruz
+        const chat_id = tg.initDataUnsafe.chat_instance || (user ? user.id.toString() : '0');
+        const istakaDiv = document.getElementById('istaka');
+
+        if (!user) {
+            istakaDiv.innerHTML = '<p style="grid-column: span 15; text-align: center;">Kullanıcı verisi yok!</p>';
+            return;
+        }
+
+        try {
+            // Sunucudaki /get_hand rotasından veriyi çekiyoruz
+            const response = await fetch(`/get_hand?user_id=${user.id}&chat_id=${chat_id}`);
+            const el = await response.json();
             
-            try {
-                const response = await fetch(`/get_hand?user_id=${user.id}&chat_id=${chat_id}`);
-                const el = await response.json();
-                
-                // Gelen eli 30 slotluk bir listeye tamamla (boşluklar için)
-                mevcutEl = new Array(30).fill(null);
+            // Gelen listeyi 30 slotluk (15x2) ıstaka yapısına yerleştiriyoruz
+            mevcutEl = new Array(30).fill(null);
+            if (Array.isArray(el)) {
                 el.forEach((tas, i) => { if(i < 30) mevcutEl[i] = tas; });
-                
-                arayuzuGuncelle();
-            } catch (e) {
-                console.error("Veri alınamadı");
             }
+            
+            arayuzuGuncelle();
+        } catch (e) {
+            console.error("Veri çekme hatası:", e);
+            istakaDiv.innerHTML = '<p style="grid-column: span 15; text-align: center;">Veri yüklenemedi!</p>';
         }
-        async function eliSunucuyaKaydet() {
-    const user = tg.initDataUnsafe.user;
-    const chat_id = tg.initDataUnsafe.chat_instance || user.id.toString();
+    }
 
-    await fetch('/save_hand', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-            user_id: user.id,
-            chat_id: chat_id,
-            el: mevcutEl // 30 slotluk güncel diziliş
-        })
-    });
-}
-        function arayuzuGuncelle() {
-            const istakaDiv = document.getElementById('istaka');
-            istakaDiv.innerHTML = '';
+    // 2. Taş Hareketlerini Veritabanına Kaydeden Fonksiyon
+    async function eliSunucuyaKaydet() {
+        const user = tg.initDataUnsafe.user;
+        const chat_id = tg.initDataUnsafe.chat_instance || (user ? user.id.toString() : '0');
 
-            mevcutEl.forEach((tas, idx) => {
-                const div = document.createElement('div');
-                div.className = `tas ${tas ? tas.renk.toLowerCase() : 'bos'}`;
-                div.innerText = tas ? tas.sayi : '';
-                div.draggable = true;
-
-                // Sürükle-Bırak Mantığı
-                div.ondragstart = () => { suruklenenIdx = idx; };
-                div.ondragover = (e) => e.preventDefault();
-                div.ondrop = () => {
-                    const temp = mevcutEl[idx];
-                    mevcutEl[idx] = mevcutEl[suruklenenIdx];
-                    mevcutEl[suruklenenIdx] = temp;
-                    arayuzuGuncelle();
-                };
-
-                istakaDiv.appendChild(div);
+        try {
+            // bot.py'deki /save_hand POST rotasına güncel dizilişi gönderiyoruz
+            const response = await fetch('/save_hand', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    user_id: user.id,
+                    chat_id: chat_id,
+                    el: mevcutEl // 30 slotluk güncel dizilim
+                })
             });
+            const result = await response.json();
+            console.log("Sunucu yanıtı:", result);
+        } catch (e) {
+            console.error("Kaydetme hatası:", e);
         }
+    }
 
-        window.onload = taslariYukle;
-    </script>
+    // 3. Istaka Arayüzünü Çizen Fonksiyon
+    function arayuzuGuncelle() {
+        const istakaDiv = document.getElementById('istaka');
+        istakaDiv.innerHTML = '';
+
+        mevcutEl.forEach((tas, idx) => {
+            const div = document.createElement('div');
+            // Taş varsa rengine göre sınıf ver, yoksa 'bos' sınıfı ver
+            div.className = `tas ${tas ? tas.renk.toLowerCase() : 'bos'}`;
+            div.innerText = tas ? tas.sayi : '';
+            div.draggable = true; // Tüm slotlar sürüklenebilir/bırakılabilir
+
+            // Sürükle-Bırak Olayları
+            div.ondragstart = () => { suruklenenIdx = idx; };
+            div.ondragover = (e) => e.preventDefault();
+            div.ondrop = async () => {
+                // Yer değiştirme işlemi
+                const temp = mevcutEl[idx];
+                mevcutEl[idx] = mevcutEl[suruklenenIdx];
+                mevcutEl[suruklenenIdx] = temp;
+                
+                // Önce görseli güncelle, sonra sunucuya kaydet
+                arayuzuGuncelle();
+                await eliSunucuyaKaydet(); 
+            };
+
+            istakaDiv.appendChild(div);
+        });
+    }
+
+    // Sayfa ilk yüklendiğinde taşları getir
+    window.onload = taslariYukle;
+</script>
 </body>
 </html>
