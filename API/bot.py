@@ -191,17 +191,24 @@ def index():
 
 @flask_app.route('/get_hand')
 def get_hand():
-    user_id = int(request.args.get('user_id'))
-    chat_id = int(request.args.get('chat_id'))
+    user_id = request.args.get('user_id')
+    chat_id = request.args.get('chat_id')
 
-    el = oyuncu_eli_getir(chat_id, user_id)
-    oyun = oyun_verisi_getir(chat_id)
+    if not user_id or not chat_id:
+        return jsonify({"error": "Eksik parametre"}), 400
+
+    oyun = oyun_verisi_getir(int(chat_id))
+
+    if not oyun:
+        return jsonify({"error": "Oyun bulunamadı"}), 404
+
+    el = oyun["players"].get(str(user_id), [])
 
     return jsonify({
         "el": el,
         "gosterge": oyun["gosterge"],
         "okey": oyun["okey"],
-        "discard": oyun.get("discard")
+        "discard": oyun["discard"]
     })
 
 

@@ -21,19 +21,46 @@ def get_connection():
 def oyunu_baslat_db(chat_id, oyuncular, deste, gosterge, okey):
     conn = get_connection()
     cur = conn.cursor()
-    players_data = {str(p['id']): p['hand'] for p in oyuncular}
-    player_ids = [p['id'] for p in oyuncular]
-    
+
+    # oyuncular = [{id, name, hand}]
+    players_data = {str(p["id"]): p["hand"] for p in oyuncular}
+    player_ids = [p["id"] for p in oyuncular]
+
     cur.execute("""
-        INSERT INTO games (chat_id, players, current_turn_id, deck, gosterge, is_active)
-        VALUES (%s, %s, %s, %s, %s, %s)
+        INSERT INTO games (
+            chat_id,
+            players,
+            current_turn_id,
+            deck,
+            gosterge,
+            okey,
+            discard,
+            is_active
+        )
+        VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
         ON CONFLICT (chat_id) DO UPDATE SET
-        players = EXCLUDED.players, current_turn_id = EXCLUDED.current_turn_id,
-        deck = EXCLUDED.deck, gosterge = EXCLUDED.gosterge, is_active = EXCLUDED.is_active;
-    """, (chat_id, json.dumps(players_data), player_ids[0], json.dumps(deste), json.dumps(gosterge), True))
+            players = EXCLUDED.players,
+            current_turn_id = EXCLUDED.current_turn_id,
+            deck = EXCLUDED.deck,
+            gosterge = EXCLUDED.gosterge,
+            okey = EXCLUDED.okey,
+            discard = EXCLUDED.discard,
+            is_active = EXCLUDED.is_active;
+    """, (
+        chat_id,
+        json.dumps(players_data),
+        player_ids[0],                 # ilk oyuncu başlar
+        json.dumps(deste),
+        json.dumps(gosterge),
+        json.dumps(okey),
+        None,                           # discard başlangıçta boş
+        True
+    ))
+
     conn.commit()
     cur.close()
     conn.close()
+
 
 def oyuncu_eli_getir(chat_id, user_id):
     conn = get_connection()
@@ -116,11 +143,13 @@ def el_analiz_et(el, okey):
 def oyun_verisi_getir(chat_id):
     conn = get_connection()
     cur = conn.cursor()
+
     cur.execute("""
-        SELECT players, deck, gosterge, okey, current_turn_id, is_active
+        SELECT players, gosterge, okey, discard
         FROM games
         WHERE chat_id = %s
     """, (chat_id,))
+
     row = cur.fetchone()
     cur.close()
     conn.close()
@@ -128,48 +157,42 @@ def oyun_verisi_getir(chat_id):
     if not row:
         return None
 
-    players, deck, gosterge, okey, current_turn_id, is_active = row
+    players, gosterge, okey, discard = row
 
     return {
         "players": players,
-        "deck": deck,
         "gosterge": gosterge,
         "okey": okey,
-        "current_turn_id": current_turn_id,
-        "is_active": is_active
+        "discard": discard
     }
+
+
 def tas_at_db(chat_id, user_id, index):
     conn = get_connection()
     cur = conn.cursor()
 
-    cur.execute("""
-        SELECT players
-        FROM games
-        WHERE chat_id = %s
-    """, (chat_id,))
+    cur.execute("SELECT players FROM games WHERE chat_id = %s", (chat_id,))
     players = cur.fetchone()[0]
 
-    el = players.get(str(user_id), [])
-
-    if index < 0 or index >= len(el) or el[index] is None:
-        cur.close()
-        conn.close()
-        return None
-
-    atilan_tas = el[index]
-    el[index] = None
+    tas = players[str(user_id)][index]
+    players[str(user_id)][index] = None
 
     cur.execute("""
         UPDATE games
         SET players = %s, discard = %s
         WHERE chat_id = %s
-    """, (json.dumps(players), json.dumps(atilan_tas), chat_id))
+    """, (
+        json.dumps(players),
+        json.dumps(tas),
+        chat_id
+    ))
 
     conn.commit()
     cur.close()
     conn.close()
 
-    return atilan_tas
+    return tas
+
 def ortaya_atilan_tasi_getir(chat_id):
     conn = get_connection()
     cur = conn.cursor()
