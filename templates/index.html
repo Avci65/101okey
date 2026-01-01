@@ -1,50 +1,125 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <style>
+        body { 
+            background: radial-gradient(circle, #1a4a5e 0%, #0d2027 100%); 
+            color: white; font-family: 'Arial', sans-serif; margin: 0; 
+            display: flex; flex-direction: column; align-items: center; height: 100vh; overflow: hidden; 
+        }
+        .header { width: 100%; padding: 8px; text-align: center; font-weight: bold; background: rgba(0,0,0,0.3); color: #00d2ff; font-size: 14px; }
+        
+        /* Istaka Alanı */
+        .istaka-container { flex-grow: 1; display: flex; align-items: center; width: 100%; justify-content: center; padding: 10px; }
+        .istaka { 
+            background: linear-gradient(to bottom, #d4a017 0%, #8b4513 100%); 
+            width: 98%; max-width: 600px; 
+            display: grid; 
+            grid-template-columns: repeat(15, 1fr); 
+            grid-template-rows: repeat(2, 1fr); 
+            gap: 3px; padding: 6px; 
+            border: 3px solid #5d2e0a; border-radius: 6px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.8);
+        }
+
+        /* Taş Tasarımı */
+        .tas { 
+            background: #fefefe; border-radius: 3px; display: flex; align-items: center; 
+            justify-content: center; font-weight: 900; font-size: 1.1rem; height: 45px; 
+            box-shadow: inset 0 -3px 0 #d1d1d1, 0 2px 4px rgba(0,0,0,0.4); 
+            position: relative; transition: transform 0.1s; cursor: pointer;
+        }
+
+        /* Renkler */
+        .kirmizi { color: #e74c3c !important; } 
+        .mavi { color: #3498db !important; } 
+        .siyah { color: #2c3e50 !important; } 
+        .sari { color: #f39c12 !important; }
+        
+        .secili { outline: 3px solid gold; z-index: 10; transform: scale(1.1); box-shadow: 0 0 15px gold; }
+        .bos { background: rgba(0,0,0,0.15); box-shadow: none; border: 1px solid rgba(255,255,255,0.05); }
+
+        /* Puan Kutusu */
+        #puanBox {
+            position: fixed; bottom: 85px; left: 15px; 
+            background: rgba(0,0,0,0.8); padding: 8px 15px; 
+            border-radius: 15px; border: 1px solid gold; 
+            color: gold; font-weight: bold; font-size: 14px;
+            display: none; /* İlk başta gizli, dizilince açılır */
+        }
+
+        .controls { width: 100%; display: flex; justify-content: center; gap: 10px; padding: 15px; background: rgba(0,0,0,0.5); }
+        button { border: none; color: white; padding: 10px 18px; border-radius: 5px; font-weight: bold; cursor: pointer; }
+    </style>
+</head>
 <body>
     <div class="header">🎴 AVCİ 101 OKEY PLUS</div>
+    
     <div class="istaka-container">
         <div class="istaka" id="istaka"></div>
     </div>
-    
-    <div id="puanBox" style="position: fixed; bottom: 85px; left: 15px; background: rgba(0,0,0,0.8); padding: 8px 15px; border-radius: 15px; border: 1px solid gold; color: gold; font-weight: bold; font-size: 14px;">
-        Per Toplamı: <span id="perPuani">0</span>
-    </div>
+
+    <div id="puanBox">Per Toplamı: <span id="perPuani">0</span></div>
 
     <div class="controls">
         <button onclick="otomatikDiz()" style="background: #f39c12;">🪄 DİZ</button>
-        <button onclick="taslariYukle()">🔄 Yenile</button>
+        <button onclick="taslariYukle()" style="background: #4ca1af;">🔄 Yenile</button>
         <button onclick="window.Telegram.WebApp.close()" style="background:#c0392b">❌ Kapat</button>
     </div>
 
     <script>
         const tg = window.Telegram.WebApp;
-        tg.ready(); tg.expand();
+        tg.ready();
+        tg.expand();
 
         let mevcutEl = [];
         let seciliIdx = null;
 
+        function renkFormatla(renk) {
+            if (!renk) return 'bos';
+            const r = renk.toLowerCase().trim();
+            if (r.includes('kirmizi') || r.includes('kırmızı') || r.includes('red')) return 'kirmizi';
+            if (r.includes('mavi') || r.includes('blue')) return 'mavi';
+            if (r.includes('sari') || r.includes('sarı') || r.includes('yellow')) return 'sari';
+            if (r.includes('siyah') || r.includes('black')) return 'siyah';
+            return 'siyah';
+        }
+
         async function taslariYukle() {
             const user = tg.initDataUnsafe.user;
             const chat_id = tg.initDataUnsafe.chat_instance || user.id.toString();
-            const response = await fetch(`/get_hand?user_id=${user.id}&chat_id=${chat_id}`);
-            const el = await response.json();
-            mevcutEl = new Array(30).fill(null);
-            el.forEach((t, i) => { if(i<30) mevcutEl[i] = t; });
-            arayuzuGuncelle();
+            try {
+                const response = await fetch(`/get_hand?user_id=${user.id}&chat_id=${chat_id}`);
+                const el = await response.json();
+                mevcutEl = new Array(30).fill(null);
+                if (Array.isArray(el)) {
+                    el.forEach((t, i) => { if(i < 30) mevcutEl[i] = t; });
+                }
+                seciliIdx = null;
+                arayuzuGuncelle();
+            } catch (e) { console.error("Hata:", e); }
         }
 
         async function otomatikDiz() {
             const user = tg.initDataUnsafe.user;
             const chat_id = tg.initDataUnsafe.chat_instance || user.id.toString();
-            const response = await fetch('/auto_sort', {
-                method: 'POST',
-                headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({user_id: user.id, chat_id: chat_id})
-            });
-            const data = await response.json();
-            if(data.success) {
-                mevcutEl = data.yeni_el;
-                document.getElementById('perPuani').innerText = data.puan;
-                arayuzuGuncelle();
-            }
+            try {
+                const response = await fetch('/auto_sort', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({user_id: user.id, chat_id: chat_id})
+                });
+                const data = await response.json();
+                if (data.success) {
+                    mevcutEl = data.yeni_el;
+                    document.getElementById('perPuani').innerText = data.puan;
+                    document.getElementById('puanBox').style.display = 'block';
+                    arayuzuGuncelle();
+                }
+            } catch (e) { console.error("Dizme hatası:", e); }
         }
 
         function arayuzuGuncelle() {
@@ -52,11 +127,11 @@
             istakaDiv.innerHTML = '';
             mevcutEl.forEach((tas, idx) => {
                 const div = document.createElement('div');
-                div.className = `tas ${tas ? tas.renk : 'bos'} ${seciliIdx === idx ? 'secili' : ''}`;
+                div.className = `tas ${tas ? renkFormatla(tas.renk) : 'bos'} ${seciliIdx === idx ? 'secili' : ''}`;
                 div.innerText = tas ? tas.sayi : '';
                 div.onclick = async () => {
-                    if(seciliIdx === null) {
-                        if(mevcutEl[idx]) { seciliIdx = idx; arayuzuGuncelle(); }
+                    if (seciliIdx === null) {
+                        if (mevcutEl[idx]) { seciliIdx = idx; arayuzuGuncelle(); }
                     } else {
                         const temp = mevcutEl[idx];
                         mevcutEl[idx] = mevcutEl[seciliIdx];
@@ -79,6 +154,8 @@
                 body: JSON.stringify({user_id: user.id, chat_id: chat_id, el: mevcutEl})
             });
         }
+
         window.onload = taslariYukle;
     </script>
 </body>
+</html>
