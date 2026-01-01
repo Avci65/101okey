@@ -81,7 +81,20 @@
                 console.error("Veri alınamadı");
             }
         }
+        async function eliSunucuyaKaydet() {
+    const user = tg.initDataUnsafe.user;
+    const chat_id = tg.initDataUnsafe.chat_instance || user.id.toString();
 
+    await fetch('/save_hand', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+            user_id: user.id,
+            chat_id: chat_id,
+            el: mevcutEl // 30 slotluk güncel diziliş
+        })
+    });
+}
         function arayuzuGuncelle() {
             const istakaDiv = document.getElementById('istaka');
             istakaDiv.innerHTML = '';

@@ -41,6 +41,20 @@ def get_hand():
         return jsonify(el if el else [])
     except ValueError:
         return jsonify({"error": "ID bilgileri sayisal olmali"}), 400
+@flask_app.route('/save_hand', methods=['POST'])
+def save_hand():
+    data = request.json
+    user_id = data.get('user_id')
+    chat_id = data.get('chat_id')
+    yeni_el = data.get('el') # 30 slotluk liste
+
+    if not user_id or not chat_id:
+        return jsonify({"success": False}), 400
+
+    # Veritabanındaki oyuncu elini yeni dizilişle güncelle
+    # Not: Boş slotlar (None) veritabanında saklanabilir veya temizlenebilir
+    oyuncu_eli_guncelle(int(chat_id), int(user_id), yeni_el)
+    return jsonify({"success": True})
 def deste_olustur():
     # Okey renklerini tanımlıyoruz
     renkler = ['Kırmızı', 'Mavi', 'Siyah', 'Sarı']
