@@ -23,57 +23,43 @@
     </div>
 
     <script>
-        const tg = window.Telegram.WebApp;
-        tg.ready();
-        tg.expand();
+    const tg = window.Telegram.WebApp;
+    tg.ready();
+    tg.expand();
 
-        async function eliYukle() {
-            const user = tg.initDataUnsafe.user;
-            const chat_id = tg.initDataUnsafe.chat_instance; 
-            const istakaDiv = document.getElementById('istaka');
-            
-            try {
-                // Bu istek bot.py'deki /get_hand rotasına gider
-                const response = await fetch(`/get_hand?user_id=${user.id}&chat_id=${chat_id}`);
-                const el = await response.json();
-                istakaDiv.innerHTML = ''; 
-                el.forEach(tas => {
-                    const div = document.createElement('div');
-                    div.className = `tas ${tas ? tas.renk.toLowerCase() : 'bos'}`;
-                    div.innerText = tas ? tas.sayi : '▫️';
-                    istakaDiv.appendChild(div);
-                });
-            } catch (e) {
-                console.log("Veri çekilemedi, örnek el gösteriliyor.");
-            }
+    async function taslariDiz() {
+        const istakaDiv = document.getElementById('istaka');
+        // Telegram'dan gelen kullanıcı bilgilerini alıyoruz
+        const user = tg.initDataUnsafe.user;
+        const chat_id = tg.initDataUnsafe.chat_instance;
+
+        if (!user) {
+            istakaDiv.innerHTML = '<p>Telegram verisi alınamadı!</p>';
+            return;
         }
-        window.onload = eliYukle;
-        async function verileriGetir() {
-    const user = tg.initDataUnsafe.user;
-    // Telegram'ın verdiği benzersiz chat instance'ı kullanıyoruz
-    const chat_id = tg.initDataUnsafe.chat_instance; 
 
-    try {
-        // Flask API'den gerçek veriyi istiyoruz
-        const response = await fetch(`/get_hand?user_id=${user.id}&chat_id=${chat_id}`);
-        const el = await response.json();
-        
-        const istaka = document.getElementById('istaka');
-        istaka.innerHTML = ''; // Eski boşluğu temizle
+        try {
+            // Sunucudaki API'den veriyi istiyoruz
+            const response = await fetch(`/get_hand?user_id=${user.id}&chat_id=${chat_id}`);
+            const el = await response.json();
 
-        el.forEach(tas => {
-            const div = document.createElement('div');
-            // Taş varsa rengine göre sınıf ekle, yoksa boş slot göster
-            div.className = `tas ${tas ? tas.renk.toLowerCase() : 'bos'}`;
-            div.innerText = tas ? tas.sayi : '▫️';
-            istaka.appendChild(div);
-        });
-    } catch (e) {
-        console.error("Veri yükleme hatası:", e);
+            istakaDiv.innerHTML = ''; // Eski içeriği temizle
+            
+            el.forEach(tas => {
+                const div = document.createElement('div');
+                // Taş varsa renk sınıfını ekle, yoksa boş slot yap
+                div.className = `tas ${tas ? tas.renk.toLowerCase() : 'bos'}`;
+                div.innerText = tas ? tas.sayi : '▫️';
+                istakaDiv.appendChild(div);
+            });
+        } catch (error) {
+            console.error("Hata:", error);
+            istakaDiv.innerHTML = '<p>Taşlar yüklenemedi!</p>';
+        }
     }
 
-}
-window.onload = verileriGetir;
-    </script>
+    // Sayfa açıldığında veriyi çek
+    window.onload = taslariDiz;
+</script>
 </body>
 </html>
