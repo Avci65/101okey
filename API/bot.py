@@ -41,7 +41,16 @@ def get_hand():
         return jsonify(el if el else [])
     except ValueError:
         return jsonify({"error": "ID bilgileri sayisal olmali"}), 400
-
+def deste_olustur():
+    # Okey renklerini tanımlıyoruz
+    renkler = ['Kırmızı', 'Mavi', 'Siyah', 'Sarı']
+    # Her renkten 1-13 arası taşlardan 2'şer set oluşturuyoruz (Toplam 104 taş)
+    deste = [{'renk': r, 'sayi': s} for r in renkler for s in range(1, 14)] * 2
+    # 2 adet Sahte Okey ekliyoruz
+    deste.extend([{'renk': 'Sahte', 'sayi': 0}] * 2)
+    # Taşları karıştırıyoruz
+    random.shuffle(deste)
+    return deste
 def run_flask():
     port = int(os.environ.get("PORT", 8080))
     flask_app.run(host='0.0.0.0', port=port)
@@ -56,6 +65,35 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "🚀 101 Okey Plus Paneline Hoş Geldin!\nIstakanı yönetmek için butona tıkla:",
         reply_markup=InlineKeyboardMarkup(keyboard)
     )
+async def katil(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user = update.effective_user
+    chat_id = update.effective_chat.id
+    
+    # 1. Kullanıcıyı lobiye ekle veya doğrudan oyunu başlat
+    # Not: Basitlik adına tek kişi katıldığında oyunu başlatıyoruz
+    deste = deste_olustur()
+    gosterge = deste.pop()
+    
+    # Oyuncu listesini hazırla
+    oyuncular = [{'id': user.id, 'name': user.first_name}]
+    
+    # Her oyuncuya taşlarını dağıt (ilk oyuncuya 22, diğerlerine 21)
+    # Burada tek oyuncu olduğu için direkt 22 taş veriyoruz
+    hand = [deste.pop() for _ in range(22)]
+    oyuncular[0]['hand'] = hand
+    
+    try:
+        # 2. Veritabanında oyunu ve eli oluştur
+        oyunu_baslat_db(chat_id, oyuncular, deste, gosterge)
+        
+        # 3. Kullanıcıya başarı mesajı gönder
+        await update.message.reply_text(
+            f"✅ {user.first_name}, masaya katıldın ve oyun başlatıldı!\n"
+            f"🎴 Taşların dağıtıldı. Şimdi panelden 'Yenile' butonuna basabilirsin."
+        )
+    except Exception as e:
+        print(f"Hata oluştu: {e}")
+        await update.message.reply_text("❌ Oyun başlatılırken bir hata oluştu.")
 
 if __name__ == '__main__':
     threading.Thread(target=run_flask, daemon=True).start()
@@ -63,6 +101,8 @@ if __name__ == '__main__':
     app = ApplicationBuilder().token(TOKEN).build()
     app.add_handler(CommandHandler("start", start))
     app.add_handler(CallbackQueryHandler(lambda u, c: None)) # Boş handler
+    # Mevcut CommandHandler satırlarının yanına ekle:
+    app.add_handler(CommandHandler("katil", katil))
     
     print("Bot ve Web App Sunucusu Aktif!")
     app.run_polling()
