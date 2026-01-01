@@ -195,14 +195,19 @@ def discard_tile():
 def get_hand():
     user_id = request.args.get('user_id')
     chat_id = request.args.get('chat_id')
-    if not user_id or user_id == 'undefined' or not chat_id:
+
+    if not user_id or not chat_id:
         return jsonify({"error": "Eksik parametre"}), 400
-    try:
-        el = oyuncu_eli_getir(int(chat_id), int(user_id))
-        normalize_el = [renk_normalize_et(tas) for tas in el] if el else []
-        return jsonify(normalize_el)
-    except Exception:
-        return jsonify([])
+
+    el = oyuncu_eli_getir(int(chat_id), int(user_id))
+    oyun = oyun_verisi_getir(int(chat_id))
+
+    return jsonify({
+        "el": [renk_normalize_et(t) for t in el] if el else [],
+        "gosterge": oyun.get("gosterge"),
+        "okey": oyun.get("okey")
+    })
+
 
 @flask_app.route('/save_hand', methods=['POST'])
 def save_hand():
