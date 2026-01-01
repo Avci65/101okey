@@ -201,14 +201,19 @@ async function acabilirMiKontrolEt() {
     const data = await res.json();
     const statusDiv = document.getElementById("openStatus");
 
+    statusDiv.style.display = "block";        // 🔥 ZORLA GÖSTER
+    statusDiv.style.zIndex = "1100";
+    statusDiv.style.color = "white";          // 🔥 HER ZEMİNDE OKUNUR
+
     if (data.can_open) {
         statusDiv.innerText = "✅ El açabilirsin (101+)";
-        statusDiv.style.color = "lightgreen";
+        statusDiv.style.borderColor = "lightgreen";
     } else {
         statusDiv.innerText = `❌ Açmak için ${101 - data.puan} puan daha gerekli`;
-        statusDiv.style.color = "#ff7675";
+        statusDiv.style.borderColor = "#ff7675";
     }
 }
+
 
 /* ================= VERİ ÇEK ================= */
 async function taslariYukle() {
