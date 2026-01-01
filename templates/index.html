@@ -1,95 +1,53 @@
 <!DOCTYPE html>
-<html lang="tr">
+<html>
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <style>
-        body { background: #0f2027; color: white; font-family: sans-serif; margin: 0; padding: 0; display: flex; flex-direction: column; align-items: center; height: 100vh; overflow: hidden; }
-        .header { background: rgba(0,0,0,0.5); width: 100%; padding: 10px; text-align: center; font-weight: bold; color: #4ca1af; border-bottom: 1px solid #333; }
-        .istaka-container { flex-grow: 1; display: flex; align-items: flex-end; width: 100%; padding-bottom: 40px; justify-content: center; }
-        .istaka { background: #2c3e50; width: 95%; height: 160px; border-radius: 10px; display: grid; grid-template-columns: repeat(11, 1fr); grid-template-rows: repeat(2, 1fr); gap: 5px; padding: 10px; box-shadow: 0 10px 30px rgba(0,0,0,0.8); border: 2px solid #34495e; }
-        .tas { background: #fdfdfd; color: #333; border-radius: 4px; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 1.2rem; box-shadow: 0 4px #bdc3c7; height: 100%; position: relative; }
-        .tas.mavi { color: #2980b9; } .tas.kirmizi { color: #c0392b; } .tas.siyah { color: #2c3e50; } .tas.sari { color: #f1c40f; }
-        .controls { width: 100%; display: flex; justify-content: space-around; padding: 15px; background: #1c1c1c; }
+        body { background: #1a1a1a; color: white; font-family: sans-serif; display: flex; flex-direction: column; align-items: center; height: 100vh; margin: 0; }
+        .istaka { background: #2c3e50; width: 95%; height: 140px; border-radius: 10px; display: grid; grid-template-columns: repeat(11, 1fr); gap: 5px; padding: 10px; border: 2px solid #34495e; }
+        .tas { background: #fdfdfd; color: #333; border-radius: 4px; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 1.2rem; height: 50px; }
+        .kirmizi { color: #c0392b; } .mavi { color: #2980b9; } .siyah { color: #2c3e50; } .sari { color: #f1c40f; }
+        .controls { margin-top: 20px; display: flex; gap: 10px; }
         button { background: #4ca1af; border: none; color: white; padding: 10px 20px; border-radius: 5px; font-weight: bold; }
     </style>
 </head>
 <body>
-    <div class="header">🎴 101 OKEY PLUS - OYUN EKRANI</div>
-    
-    <div class="istaka-container">
-        <div class="istaka" id="istaka">
-            </div>
-    </div>
-
+    <h3 style="color: #4ca1af;">🎴 101 OKEY PLUS</h3>
+    <div class="istaka" id="istaka">
+        </div>
     <div class="controls">
-        <button onclick="window.location.reload()">🔄 Yenile</button>
-        <button onclick="Telegram.WebApp.close()">❌ Kapat</button>
+        <button onclick="eliYukle()">🔄 Yenile</button>
+        <button onclick="tg.close()">❌ Kapat</button>
     </div>
 
-<script>
-    // Telegram WebApp nesnesini başlatıyoruz
-    const tg = window.Telegram.WebApp;
-    
-    // Uygulama ayarları
-    tg.ready();
-    tg.expand(); // Ekranı tam boy yapar
+    <script>
+        const tg = window.Telegram.WebApp;
+        tg.ready();
+        tg.expand();
 
-    // Telegram'dan kullanıcı verilerini alıyoruz
-    const user = tg.initDataUnsafe.user;
-    
-    // chat_id'yi almak için: Eğer bot butonla chat_id gönderdiyse onu kullanırız, 
-    // yoksa Telegram'ın sağladığı chat_instance'ı deneriz.
-    const urlParams = new URLSearchParams(window.location.search);
-    const chat_id = urlParams.get('chat_id') || tg.initDataUnsafe.chat_instance;
-
-    // Islakayı dolduran ana fonksiyon
-    async function eliYukle() {
-        const istakaDiv = document.getElementById('istaka');
-        
-        try {
-            // Railway üzerindeki Flask API'sine istek atıyoruz
-            // Not: fetch içindeki URL, bot.py'deki @flask_app.route('/get_hand') ile eşleşmeli
-            const response = await fetch(`/get_hand?user_id=${user.id}&chat_id=${chat_id}`);
+        async function eliYukle() {
+            const user = tg.initDataUnsafe.user;
+            const chat_id = tg.initDataUnsafe.chat_instance; 
+            const istakaDiv = document.getElementById('istaka');
             
-            if (!response.ok) throw new Error('Veri çekilemedi');
-            
-            const el = await response.json();
-            
-            // Mevcut (örnek) taşları temizle
-            istakaDiv.innerHTML = '';
-
-            // Gelen el verisini döngüye sokup taşları oluştur
-            el.forEach(tas => {
-                const div = document.createElement('div');
-                
-                if (tas === null) {
-                    // Boşluklar için
-                    div.className = 'tas bos';
-                    div.innerText = '▫️';
-                } else {
-                    // Renk sınıflarını (kirmizi, mavi vb.) küçük harfe çevirip ekle
-                    div.className = `tas ${tas.renk.toLowerCase()}`;
-                    div.innerText = tas.sayi;
-                }
-                
-                istakaDiv.appendChild(div);
-            });
-
-        } catch (error) {
-            console.error('Hata:', error);
-            istakaDiv.innerHTML = '<p style="color:red; font-size:12px;">Hata: Veri yüklenemedi!</p>';
+            try {
+                // Bu istek bot.py'deki /get_hand rotasına gider
+                const response = await fetch(`/get_hand?user_id=${user.id}&chat_id=${chat_id}`);
+                const el = await response.json();
+                istakaDiv.innerHTML = ''; 
+                el.forEach(tas => {
+                    const div = document.createElement('div');
+                    div.className = `tas ${tas ? tas.renk.toLowerCase() : 'bos'}`;
+                    div.innerText = tas ? tas.sayi : '▫️';
+                    istakaDiv.appendChild(div);
+                });
+            } catch (e) {
+                console.log("Veri çekilemedi, örnek el gösteriliyor.");
+            }
         }
-    }
-
-    // Sayfa yüklendiğinde fonksiyonu çalıştır
-    window.onload = eliYukle;
-
-    // "Yenile" butonu fonksiyonu
-    function yenile() {
-        eliYukle();
-    }
-</script>
+        window.onload = eliYukle;
+    </script>
 </body>
 </html>
