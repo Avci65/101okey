@@ -5,25 +5,48 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <style>
-        body { background: #0f2027; color: white; font-family: sans-serif; margin: 0; display: flex; flex-direction: column; align-items: center; height: 100vh; overflow: hidden; }
-        .header { background: rgba(0,0,0,0.5); width: 100%; padding: 15px; text-align: center; font-weight: bold; color: #4ca1af; border-bottom: 1px solid #333; }
-        .istaka-container { flex-grow: 1; display: flex; align-items: center; justify-content: center; width: 100%; }
-        .istaka { background: #2c3e50; width: 90%; min-height: 120px; border-radius: 12px; display: grid; grid-template-columns: repeat(11, 1fr); gap: 6px; padding: 12px; box-shadow: 0 10px 25px rgba(0,0,0,0.5); border: 2px solid #34495e; }
-        .tas { background: #fdfdfd; color: #333; border-radius: 4px; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 1.1rem; height: 50px; box-shadow: 0 3px #bdc3c7; }
-        .kirmizi { color: #c0392b; } .mavi { color: #2980b9; } .siyah { color: #2c3e50; } .sari { color: #f1c40f; } .bos { opacity: 0.3; background: transparent; box-shadow: none; border: 1px dashed #555; }
-        .controls { width: 100%; display: flex; justify-content: center; gap: 20px; padding: 20px; background: #1c1c1c; }
-        button { background: #4ca1af; border: none; color: white; padding: 12px 24px; border-radius: 8px; font-weight: bold; cursor: pointer; }
+        body { 
+            background: radial-gradient(circle, #1a4a5e 0%, #0d2027 100%); 
+            color: white; font-family: 'Arial', sans-serif; margin: 0; 
+            display: flex; flex-direction: column; align-items: center; height: 100vh; overflow: hidden; 
+        }
+        .header { width: 100%; padding: 10px; text-align: center; font-weight: bold; background: rgba(0,0,0,0.3); color: #00d2ff; }
+        
+        /* Istaka Alanı - Referans görsele uygun ahşap/altın tonları */
+        .istaka-container { flex-grow: 1; display: flex; align-items: flex-end; padding-bottom: 50px; width: 100%; justify-content: center; }
+        .istaka { 
+            background: linear-gradient(to bottom, #d4a017 0%, #8b4513 100%); 
+            width: 95%; max-width: 500px; height: 160px; border-radius: 8px; 
+            display: grid; grid-template-columns: repeat(11, 1fr); grid-template-rows: repeat(2, 1fr); 
+            gap: 4px; padding: 8px; border: 3px solid #5d2e0a; box-shadow: 0 10px 30px rgba(0,0,0,0.8);
+        }
+
+        /* Taş Tasarımı - Referans görsele benzer dolgun yapı */
+        .tas { 
+            background: #fefefe; border-radius: 4px; display: flex; align-items: center; 
+            justify-content: center; font-weight: 900; font-size: 1.4rem; height: 65px; 
+            box-shadow: inset 0 -5px 0 #d1d1d1, 0 4px 5px rgba(0,0,0,0.4); 
+            position: relative; cursor: grab; transition: transform 0.1s;
+        }
+        .tas:active { transform: scale(0.95); cursor: grabbing; }
+        .tas::after { content: ''; position: absolute; bottom: 8px; width: 8px; height: 8px; background: #eee; border-radius: 50%; box-shadow: inset 0 2px 2px rgba(0,0,0,0.2); }
+        
+        /* Renkler */
+        .kirmizi { color: #e74c3c; } .mavi { color: #3498db; } .siyah { color: #2c3e50; } .sari { color: #f1c40f; }
+        .bos { background: rgba(0,0,0,0.2); box-shadow: none; border: 1px solid rgba(255,255,255,0.1); }
+        
+        .controls { width: 100%; display: flex; justify-content: center; gap: 15px; padding: 15px; background: rgba(0,0,0,0.5); }
+        button { background: #00d2ff; border: none; color: white; padding: 10px 20px; border-radius: 5px; font-weight: bold; }
     </style>
 </head>
 <body>
-    <div class="header">🎴 AVCİ 101 OKEY </div>
+    <div class="header">🎴 AVCİ 101 OKEY PLUS</div>
     <div class="istaka-container">
-        <div class="istaka" id="istaka">
-            </div>
+        <div class="istaka" id="istaka"></div>
     </div>
     <div class="controls">
         <button onclick="taslariYukle()">🔄 Yenile</button>
-        <button onclick="window.Telegram.WebApp.close()" style="background:#c0392b">❌ Kapat</button>
+        <button onclick="tg.close()" style="background:#ff4b2b">❌ Kapat</button>
     </div>
 
     <script>
@@ -31,34 +54,40 @@
         tg.ready();
         tg.expand();
 
-    async function taslariYukle() {
-    const tg = window.Telegram.WebApp;
-    const user = tg.initDataUnsafe.user;
-    const chat_id = tg.initDataUnsafe.chat_instance || user.id.toString();
-    const istakaDiv = document.getElementById('istaka');
+        let suruklenenTasIdx = null;
 
-    try {
-        const response = await fetch(`/get_hand?user_id=${user.id}&chat_id=${chat_id}`);
-        const el = await response.json();
-        
-        istakaDiv.innerHTML = ''; // Temizle
-
-        if (el.length === 0) {
-            istakaDiv.innerHTML = '<p style="grid-column: span 11; text-align: center;">Oyun başlamadı! Lütfen bota /katil yazın.</p>';
-            return;
+        async function taslariYukle() {
+            const user = tg.initDataUnsafe.user;
+            const chat_id = tg.initDataUnsafe.chat_instance || user.id.toString();
+            const response = await fetch(`/get_hand?user_id=${user.id}&chat_id=${chat_id}`);
+            const el = await response.json();
+            dizIstaka(el);
         }
 
-        el.forEach(tas => {
-            const div = document.createElement('div');
-            // Taş verisi varsa sınıflandır, yoksa boş slot yap
-            div.className = `tas ${tas ? tas.renk.toLowerCase() : 'bos'}`;
-            div.innerText = tas ? tas.sayi : '▫️';
-            istakaDiv.appendChild(div);
-        });
-    } catch (e) {
-        istakaDiv.innerHTML = '<p>Veri çekme hatası!</p>';
-    }
-}
+        function dizIstaka(el) {
+            const istakaDiv = document.getElementById('istaka');
+            istakaDiv.innerHTML = '';
+            el.forEach((tas, idx) => {
+                const div = document.createElement('div');
+                div.className = `tas ${tas ? tas.renk.toLowerCase() : 'bos'}`;
+                div.innerText = tas ? tas.sayi : '';
+                div.draggable = tas ? true : false;
+                
+                // Sürükle-Bırak Olayları
+                div.ondragstart = () => { suruklenenTasIdx = idx; };
+                div.ondragover = (e) => e.preventDefault();
+                div.ondrop = () => yerDegistir(idx);
+                
+                istakaDiv.appendChild(div);
+            });
+        }
+
+        function yerDegistir(hedefIdx) {
+            // Burada frontend'de yer değiştirip sonra sunucuya kaydedebilirsin
+            console.log(`${suruklenenTasIdx} ile ${hedefIdx} yer değişiyor`);
+            // Kaydetme API'si buraya gelecek
+        }
+
         window.onload = taslariYukle;
     </script>
 </body>
