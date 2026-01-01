@@ -59,6 +59,87 @@ def save_hand():
     except Exception as e:
         return jsonify({"success": False, "error": str(e)}), 500
 @flask_app.route('/auto_sort', methods=['POST'])
+def per_analiz_et(taslar):
+    # Bu fonksiyon eldeki en iyi per kombinasyonlarını bulur
+    seri_perler = []
+    grup_perler = []
+    
+    # Renklere göre ayır (Seri perler için)
+    renkler = {}
+    for t in taslar:
+        r = t['renk']
+        if r not in renkler: renkler[r] = []
+        renkler[r].append(t)
+    
+    # Sayılara göre ayır (Grup perler için)
+    sayilar = {}
+    for t in taslar:
+        s = t['sayi']
+        if s not in sayilar: sayilar[s] = []
+        sayilar[s].append(t)
+
+    # 1. Seri Perleri Bul (Örn: Mavi 1-2-3)
+    final_dizilim = []
+    kullanilan_taslar = set()
+
+    for r in renkler:
+        liste = sorted(renkler[r], key=lambda x: x['sayi'])
+        gecici_per = []
+        for i in range(len(liste)):
+            if not gecici_per or liste[i]['sayi'] == gecici_per[-1]['sayi'] + 1:
+                gecici_per.append(liste[i])
+            else:
+                if len(gecici_per) >= 3:
+                    final_dizilim.append(gecici_per)
+                    for p in gecici_per: kullanilan_taslar.add(f"{p['renk']}-{p['sayi']}")
+                gecici_per = [liste[i]]
+        if len(gecici_per) >= 3:
+            final_dizilim.append(gecici_per)
+            for p in gecici_per: kullanilan_taslar.add(f"{p['renk']}-{p['sayi']}")
+
+    # 2. Grup Perleri Bul (Örn: Siyah 5 - Mavi 5 - Kırmızı 5)
+    for s in sayilar:
+        liste = sayilar[s]
+        # Aynı renkten taşları filtrele
+        benzersiz_renkler = []
+        gorulen_renkler = set()
+        for t in liste:
+            if t['renk'] not in gorulen_renkler and f"{t['renk']}-{t['sayi']}" not in kullanilan_taslar:
+                benzersiz_renkler.append(t)
+                gorulen_renkler.add(t['renk'])
+        
+        if len(benzersiz_renkler) >= 3:
+            final_dizilim.append(benzersiz_renkler)
+            for p in benzersiz_renkler: kullanilan_taslar.add(f"{p['renk']}-{p['sayi']}")
+
+    # Perleri yan yana koy, aralarına birer boşluk (None) ekle
+    sonuc_istaka = []
+    toplam_puan = 0
+    for per in final_dizilim:
+        sonuc_istaka.extend(per)
+        sonuc_istaka.append(None) # Perler arası boşluk
+        toplam_puan += sum(t['sayi'] for t in per)
+
+    # Kalan boş taşları en sona ekle
+    kalanlar = [t for t in taslar if f"{t['renk']}-{t['sayi']}" not in kullanilan_taslar]
+    sonuc_istaka.extend(kalanlar)
+    
+    # 30'a tamamla
+    while len(sonuc_istaka) < 30:
+        sonuc_istaka.append(None)
+        
+    return sonuc_istaka[:30], toplam_puan
+
+@flask_app.route('/auto_sort', methods=['POST'])
+def auto_sort():
+    data = request.json
+    el = oyuncu_eli_getir(data['chat_id'], data['user_id'])
+    taslar = [t for t in el if t is not None]
+    
+    yeni_el, puan = per_analiz_et(taslar)
+    oyuncu_eli_guncelle(data['chat_id'], data['user_id'], yeni_el)
+    
+    return jsonify({"success": True, "yeni_el": yeni_el, "puan": puan})
 def auto_sort():
     data = request.json
     user_id = data.get('user_id')

@@ -57,7 +57,9 @@
         <button onclick="taslariYukle()">🔄 Yenile</button>
         <button onclick="window.Telegram.WebApp.close()" style="background:#c0392b">❌ Kapat</button>
     </div>
-
+<div style="position: fixed; bottom: 80px; left: 20px; background: rgba(0,0,0,0.7); padding: 5px 15px; border-radius: 20px; border: 1px solid gold; color: gold; font-weight: bold;">
+    Per Toplamı: <span id="perPuani">0</span>
+</div>
     <script>
         const tg = window.Telegram.WebApp;
         tg.ready();
@@ -77,6 +79,14 @@
             if (r.includes('siyah') || r.includes('black')) return 'siyah';
             return 'siyah'; // Varsayılan
         }
+        async function otomatikDiz() {
+    // ... fetch kodları ...
+    if (data.success) {
+        mevcutEl = data.yeni_el;
+        document.getElementById('perPuani').innerText = data.puan; // Puanı yazdır
+        arayuzuGuncelle(); //
+    }
+}
 
         async function taslariYukle() {
             const user = tg.initDataUnsafe.user;
