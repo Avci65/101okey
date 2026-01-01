@@ -53,6 +53,7 @@
         <div class="istaka" id="istaka"></div>
     </div>
     <div class="controls">
+        <button onclick="otomatikDiz()" style="background: #f39c12;">🪄 DİZ</button>
         <button onclick="taslariYukle()">🔄 Yenile</button>
         <button onclick="window.Telegram.WebApp.close()" style="background:#c0392b">❌ Kapat</button>
     </div>
@@ -96,6 +97,32 @@
                 console.error("Yükleme hatası:", e);
             }
         }
+    async function otomatikDiz() {
+    const user = tg.initDataUnsafe.user;
+    const chat_id = tg.initDataUnsafe.chat_instance || user.id.toString();
+
+    // Butonu geçici olarak devre dışı bırak
+    const btn = event.target;
+    btn.disabled = true;
+
+    try {
+        const response = await fetch('/auto_sort', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ user_id: user.id, chat_id: chat_id })
+        });
+        
+        const data = await response.json();
+        if (data.success) {
+            mevcutEl = data.yeni_el; // Gelen sıralı eli yerel değişkene ata
+            arayuzuGuncelle();      // Arayüzü tazele
+        }
+    } catch (e) {
+        console.error("Dizme hatası:", e);
+    } finally {
+        btn.disabled = false;
+      }
+  }
 
         function arayuzuGuncelle() {
             const istakaDiv = document.getElementById('istaka');

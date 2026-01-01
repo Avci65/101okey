@@ -58,6 +58,40 @@ def save_hand():
         return jsonify({"success": True})
     except Exception as e:
         return jsonify({"success": False, "error": str(e)}), 500
+@flask_app.route('/auto_sort', methods=['POST'])
+def auto_sort():
+    data = request.json
+    user_id = data.get('user_id')
+    chat_id = data.get('chat_id')
+    
+    if not user_id or not chat_id:
+        return jsonify({"success": False}), 400
+        
+    try:
+        # Mevcut eli veritabanından çek
+        el = oyuncu_eli_getir(int(chat_id), int(user_id))
+        if not el:
+            return jsonify({"success": False, "error": "El bulunamadı"}), 404
+
+        # None (boşluk) olanları temizle ve sadece taşları al
+        taslar = [t for t in el if t is not None]
+        
+        # Basit bir dizme mantığı: Önce renge, sonra sayıya göre sırala
+        # (Daha gelişmiş 'per' algılama algoritması buraya eklenebilir)
+        sirali_taslar = sorted(taslar, key=lambda x: (x['renk'], x['sayi']))
+        
+        # 30 slotluk yeni ıstakayı oluştur
+        yeni_istaka = [None] * 30
+        for i, tas in enumerate(sirali_taslar):
+            if i < 30:
+                yeni_istaka[i] = tas
+        
+        # Veritabanını güncelle
+        oyuncu_eli_guncelle(int(chat_id), int(user_id), yeni_istaka)
+        
+        return jsonify({"success": True, "yeni_el": yeni_istaka})
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 500
 def deste_olustur():
     # Okey renklerini tanımlıyoruz
     renkler = ['Kırmızı', 'Mavi', 'Siyah', 'Sarı']
