@@ -191,9 +191,21 @@ def run_flask():
 # --- BOT KOMUTLARI ---
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    webapp_url = "https://worker-production-9405.up.railway.app"
-    keyboard = [[InlineKeyboardButton("🎴 Oyun Panelini Aç", web_app=WebAppInfo(url=webapp_url))]]
-    await update.message.reply_text("🚀 101 Okey Plus Paneline Hoş Geldin!", reply_markup=InlineKeyboardMarkup(keyboard))
+    chat_id = update.effective_chat.id
+    webapp_url = f"https://worker-production-9405.up.railway.app/?chat_id={chat_id}"
+
+    keyboard = [[
+        InlineKeyboardButton(
+            "🎴 Oyun Panelini Aç",
+            web_app=WebAppInfo(url=webapp_url)
+        )
+    ]]
+
+    await update.message.reply_text(
+        "🚀 101 Okey Plus Paneline Hoş Geldin!",
+        reply_markup=InlineKeyboardMarkup(keyboard)
+    )
+
 
 async def katil(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user, chat_id = update.effective_user, update.effective_chat.id
