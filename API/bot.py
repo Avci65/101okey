@@ -205,6 +205,26 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "🚀 101 Okey Plus Paneline Hoş Geldin!",
         reply_markup=InlineKeyboardMarkup(keyboard)
     )
+def renk_normalize_et(tas):
+    if not tas:
+        return None
+
+    # EĞER RENK YOKSA HATA
+    if 'renk' not in tas:
+        raise ValueError(f"Taşta renk yok: {tas}")
+
+    renk = str(tas['renk']).lower()
+
+    if 'kirmizi' in renk or 'kırmızı' in renk or 'red' in renk:
+        tas['renk'] = 'kirmizi'
+    elif 'mavi' in renk or 'blue' in renk:
+        tas['renk'] = 'mavi'
+    elif 'sari' in renk or 'yellow' in renk:
+        tas['renk'] = 'sari'
+    elif 'siyah' in renk or 'black' in renk:
+        tas['renk'] = 'siyah'
+
+    return tas
 
 
 async def katil(update: Update, context: ContextTypes.DEFAULT_TYPE):
