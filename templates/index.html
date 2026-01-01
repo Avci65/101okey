@@ -46,10 +46,17 @@
         .sari { color: #f1c40f; }
 
         .controls {
-            width: 100%; display: flex;
-            justify-content: center; gap: 10px;
-            padding: 15px; background: rgba(0,0,0,0.4);
-        }
+    position: fixed;
+    bottom: 0;
+    width: 100%;
+    display: flex;
+    justify-content: center;
+    gap: 10px;
+    padding: 15px;
+    background: rgba(0,0,0,0.6);
+    z-index: 1000;
+}
+
         button {
             padding: 10px 18px; border: none;
             border-radius: 5px; font-weight: bold;
@@ -66,7 +73,7 @@
     </div>
 <div id="puanBox" style="
     position: fixed;
-    bottom: 85px;
+    bottom: 120px;
     left: 15px;
     background: rgba(0,0,0,0.8);
     padding: 8px 15px;
@@ -76,13 +83,14 @@
     font-weight: bold;
     font-size: 14px;
     display: none;
+    z-index :1100;
 ">
     Per Toplamı: <span id="perPuani">0</span>
 </div>
 
 <div id="openStatus" style="
     position: fixed;
-    bottom: 45px;
+    bottom: 80px;
     left: 15px;
     background: rgba(7, 14, 2, 0.8);
     padding: 6px 12px;
@@ -90,8 +98,9 @@
     font-size: 13px;
     font-weight: bold;
     border: 1px solid #555;
-    z-index: 9999;
+    z-index: 1100;
 ">
+</div>
 
 
 
