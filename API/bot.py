@@ -30,6 +30,8 @@ flask_app = Flask(__name__, template_folder=template_path)
 
 def per_gecerli_mi(grup):
     """Bir taş grubunun 101 kurallarına göre per olup olmadığını denetler."""
+    if any(t["renk"] == "sahte" for t in grup):
+     return True
     if len(grup) < 3: 
         return False
     
@@ -122,6 +124,18 @@ def deste_olustur():
     deste.extend([{'renk': 'sahte', 'sayi': 0}] * 2)
     random.shuffle(deste)
     return deste
+def okey_belirle(gosterge):
+    # Gösterge 13 ise okey 1 olur
+    if gosterge["sayi"] == 13:
+        sayi = 1
+    else:
+        sayi = gosterge["sayi"] + 1
+
+    return {
+        "renk": gosterge["renk"],
+        "sayi": sayi
+    }
+
 def oyuncu_daha_once_acti_mi(chat_id, user_id):
     oyun = oyun_verisi_getir(chat_id)
     if not oyun:
@@ -138,6 +152,10 @@ def oyuncu_daha_once_acti_mi(chat_id, user_id):
 # --- FLASK ROTALARI ---
 @flask_app.route('/draw_tile', methods=['POST'])
 def draw_tile():
+    # Oyuncu zaten çektiyse tekrar çekemez
+    if oyun_verisi_getir(chat_id).get("cekildi"):
+     return jsonify({"success": False, "error": "Önce taş atmalısın"})
+
     data = request.json
     chat_id, user_id = data['chat_id'], data['user_id']
     
@@ -150,6 +168,28 @@ def draw_tile():
 @flask_app.route('/')
 def index():
     return render_template('index.html')
+@flask_app.route('/discard_tile', methods=['POST'])
+def discard_tile():
+    data = request.json
+    chat_id = int(data["chat_id"])
+    user_id = int(data["user_id"])
+    index = int(data["index"])
+
+    el = oyuncu_eli_getir(chat_id, user_id)
+
+    if index < 0 or index >= len(el):
+        return jsonify({"success": False})
+
+    atilan = el[index]
+    el[index] = None
+
+    oyuncu_eli_guncelle(chat_id, user_id, el)
+
+    # Burada ortaya atılan taşı da kaydedebilirsin
+    # oyun["orta"].append(atilan)
+
+    return jsonify({"success": True})
+
 
 @flask_app.route('/get_hand')
 def get_hand():
@@ -263,16 +303,48 @@ def renk_normalize_et(tas):
 
 
 async def katil(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    user, chat_id = update.effective_user, update.effective_chat.id
+    user = update.effective_user
+    chat_id = update.effective_chat.id
+
+    # 1️⃣ Deste oluştur
     deste = deste_olustur()
+
+    # 2️⃣ Gösterge çek
     gosterge = deste.pop()
+
+    # 3️⃣ Okey belirle
+    okey = okey_belirle(gosterge)
+
+    # 4️⃣ Oyuncuya 22 taş dağıt
     hand = [deste.pop() for _ in range(22)]
-    oyuncular = [{'id': user.id, 'name': user.first_name, 'hand': hand}]
+
+    oyuncular = [{
+        "id": user.id,
+        "name": user.first_name,
+        "hand": hand
+    }]
+
+    # 5️⃣ Oyunu DB'de başlat
     try:
-        oyunu_baslat_db(chat_id, oyuncular, deste, gosterge)
-        await update.message.reply_text(f"✅ {user.first_name}, oyun başlatıldı!")
+        oyunu_baslat_db(
+            chat_id=chat_id,
+            oyuncular=oyuncular,
+            deste=deste,
+            gosterge=gosterge,
+            okey=okey
+        )
+
+        await update.message.reply_text(
+            f"🎴 Oyun başlatıldı!\n\n"
+            f"🟨 Gösterge: {gosterge['renk']} {gosterge['sayi']}\n"
+            f"⭐ Okey: {okey['renk']} {okey['sayi']}\n\n"
+            f"Panelden oyuna devam edebilirsin 👇"
+        )
+
     except Exception as e:
-        await update.message.reply_text("❌ Hata oluştu.")
+        await update.message.reply_text("❌ Oyun başlatılırken hata oluştu.")
+        print("KATIL HATASI:", e)
+
 
 if __name__ == '__main__':
     threading.Thread(target=run_flask, daemon=True).start()
