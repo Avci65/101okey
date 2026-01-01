@@ -24,7 +24,7 @@ template_dir = os.path.join(os.path.dirname(base_dir), 'templates')
 
 flask_app = Flask(__name__, template_folder=template_dir)
 
-@flask_app.route('/gethand')
+@flask_app.route('/')
 def get_hand():
     user_id = request.args.get('user_id')
     chat_id = request.args.get('chat_id')
