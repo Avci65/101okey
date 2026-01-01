@@ -12,139 +12,134 @@
         }
         .header { width: 100%; padding: 8px; text-align: center; font-weight: bold; background: rgba(0,0,0,0.3); color: #00d2ff; font-size: 14px; }
         
-        /* Istaka Konteynırı - Taş boyutlarını dengelemek için küçültüldü */
+        /* Istaka Yapısı */
         .istaka-container { flex-grow: 1; display: flex; align-items: center; width: 100%; justify-content: center; padding: 10px; }
         .istaka { 
             background: linear-gradient(to bottom, #d4a017 0%, #8b4513 100%); 
             width: 98%; max-width: 600px; 
             display: grid; 
-            /* 15 Sütun yaparak boşluk alanı açıyoruz */
-            grid-template-columns: repeat(15, 1fr); 
+            grid-template-columns: repeat(15, 1fr); /* 15 Sütun */
             grid-template-rows: repeat(2, 1fr); 
             gap: 3px; padding: 6px; 
             border: 3px solid #5d2e0a; border-radius: 6px;
             box-shadow: 0 10px 30px rgba(0,0,0,0.8);
         }
 
-        /* Taş Boyutları Küçültüldü */
+        /* Taş Tasarımı */
         .tas { 
             background: #fefefe; border-radius: 3px; display: flex; align-items: center; 
             justify-content: center; font-weight: 900; font-size: 1.1rem; height: 45px; 
             box-shadow: inset 0 -3px 0 #d1d1d1, 0 2px 4px rgba(0,0,0,0.4); 
-            position: relative; cursor: grab; transition: transform 0.1s;
+            position: relative; transition: transform 0.1s;
         }
-        .tas:active { transform: scale(0.95); cursor: grabbing; }
+
+        /* Renk Sabitleme */
+        .kirmizi { color: #e74c3c !important; } 
+        .mavi { color: #3498db !important; } 
+        .siyah { color: #2c3e50 !important; } 
+        .sari { color: #f39c12 !important; }
         
-        /* Renk Kodları */
-        .kirmizi { color: #e74c3c; } .mavi { color: #3498db; } .siyah { color: #2c3e50; } .sari { color: #f1c40f; }
-        
-        /* Boş Slot Görünümü */
+        /* Seçili Taş Efekti */
+        .secili { outline: 3px solid gold; z-index: 10; transform: scale(1.05); }
         .bos { background: rgba(0,0,0,0.15); box-shadow: none; border: 1px solid rgba(255,255,255,0.05); }
 
         .controls { width: 100%; display: flex; justify-content: center; gap: 10px; padding: 15px; background: rgba(0,0,0,0.5); }
-        button { background: #4ca1af; border: none; color: white; padding: 8px 16px; border-radius: 5px; font-weight: bold; font-size: 13px; }
+        button { background: #4ca1af; border: none; color: white; padding: 10px 20px; border-radius: 5px; font-weight: bold; cursor: pointer; }
     </style>
 </head>
 <body>
     <div class="header">🎴 AVCİ 101 OKEY PLUS</div>
     <div class="istaka-container">
-        <div class="istaka" id="istaka">
-            </div>
+        <div class="istaka" id="istaka"></div>
     </div>
     <div class="controls">
         <button onclick="taslariYukle()">🔄 Yenile</button>
         <button onclick="window.Telegram.WebApp.close()" style="background:#c0392b">❌ Kapat</button>
     </div>
 
- <script>
-    const tg = window.Telegram.WebApp;
-    tg.ready();
-    tg.expand();
+    <script>
+        const tg = window.Telegram.WebApp;
+        tg.ready();
+        tg.expand();
 
-    let mevcutEl = [];
-    let suruklenenIdx = null;
+        let mevcutEl = [];
+        let seciliIdx = null;
 
-    // 1. Taşları Yükle
-    async function taslariYukle() {
-        const user = tg.initDataUnsafe.user;
-        const chat_id = tg.initDataUnsafe.chat_instance || (user ? user.id.toString() : '0');
-        
-        try {
-            const response = await fetch(`/get_hand?user_id=${user.id}&chat_id=${chat_id}`);
-            const el = await response.json();
-            
-            mevcutEl = new Array(30).fill(null);
-            if (Array.isArray(el)) {
-                el.forEach((tas, i) => { if(i < 30) mevcutEl[i] = tas; });
-            }
-            arayuzuGuncelle();
-        } catch (e) {
-            console.error("Yükleme hatası:", e);
+        // Renk ismini temizleyip CSS sınıfına çeviren fonksiyon
+        function renkDuzenle(renk) {
+            if (!renk) return 'bos';
+            const r = renk.toLowerCase();
+            if (r.includes('kirmizi')) return 'kirmizi';
+            if (r.includes('mavi')) return 'mavi';
+            if (r.includes('siyah')) return 'siyah';
+            if (r.includes('sari')) return 'sari';
+            return 'siyah'; // Varsayılan
         }
-    }
 
-    // 2. Sunucuya Kaydet
-    async function eliSunucuyaKaydet() {
-        const user = tg.initDataUnsafe.user;
-        const chat_id = tg.initDataUnsafe.chat_instance || (user ? user.id.toString() : '0');
-        await fetch('/save_hand', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ user_id: user.id, chat_id: chat_id, el: mevcutEl })
-        });
-    }
-
-    // 3. Mobil ve PC Uyumlu Arayüz
-    function arayuzuGuncelle() {
-        const istakaDiv = document.getElementById('istaka');
-        istakaDiv.innerHTML = '';
-
-        mevcutEl.forEach((tas, idx) => {
-            const div = document.createElement('div');
-            div.className = `tas ${tas ? tas.renk.toLowerCase() : 'bos'}`;
-            div.innerText = tas ? tas.sayi : '';
+        async function taslariYukle() {
+            const user = tg.initDataUnsafe.user;
+            const chat_id = tg.initDataUnsafe.chat_instance || (user ? user.id.toString() : '0');
             
-            // --- PC SÜRÜKLE BIRAK ---
-            div.draggable = true;
-            div.ondragstart = () => { suruklenenIdx = idx; };
-            div.ondragover = (e) => e.preventDefault();
-            div.ondrop = async () => handleDrop(idx);
-
-            // --- MOBİL DOKUNMATİK (Click-to-Move) ---
-            // Mobilde en stabil yöntem: Önce kaynağa tıkla, sonra hedefe tıkla.
-            div.onclick = async () => {
-                if (suruklenenIdx === null) {
-                    if (mevcutEl[idx] !== null) {
-                        suruklenenIdx = idx;
-                        div.style.border = "2px solid gold"; // Seçili olduğunu belli et
-                        div.style.transform = "scale(1.1)";
-                    }
-                } else {
-                    await handleDrop(idx);
+            try {
+                const response = await fetch(`/get_hand?user_id=${user.id}&chat_id=${chat_id}`);
+                const el = await response.json();
+                
+                mevcutEl = new Array(30).fill(null);
+                if (Array.isArray(el)) {
+                    el.forEach((tas, i) => { if(i < 30) mevcutEl[i] = tas; });
                 }
-            };
-
-            istakaDiv.appendChild(div);
-        });
-    }
-
-    // Ortak Yer Değiştirme Fonksiyonu
-    async function handleDrop(hedefIdx) {
-        if (suruklenenIdx !== null && suruklenenIdx !== hedefIdx) {
-            const temp = mevcutEl[hedefIdx];
-            mevcutEl[hedefIdx] = mevcutEl[suruklenenIdx];
-            mevcutEl[suruklenenIdx] = temp;
-            
-            suruklenenIdx = null;
-            arayuzuGuncelle();
-            await eliSunucuyaKaydet();
-        } else {
-            suruklenenIdx = null;
-            arayuzuGuncelle();
+                arayuzuGuncelle();
+            } catch (e) {
+                console.error("Yükleme hatası:", e);
+            }
         }
-    }
 
-    window.onload = taslariYukle;
-</script>
+        function arayuzuGuncelle() {
+            const istakaDiv = document.getElementById('istaka');
+            istakaDiv.innerHTML = '';
+
+            mevcutEl.forEach((tas, idx) => {
+                const div = document.createElement('div');
+                const temizRenk = tas ? renkDuzenle(tas.renk) : 'bos';
+                div.className = `tas ${temizRenk}`;
+                if (seciliIdx === idx) div.classList.add('secili');
+                
+                div.innerText = tas ? tas.sayi : '';
+
+                // Mobil Uyumlu Tıkla-Taşı Sistemi
+                div.onclick = async () => {
+                    if (seciliIdx === null) {
+                        if (mevcutEl[idx]) {
+                            seciliIdx = idx;
+                            arayuzuGuncelle();
+                        }
+                    } else {
+                        // Yer değiştirme
+                        const temp = mevcutEl[idx];
+                        mevcutEl[idx] = mevcutEl[seciliIdx];
+                        mevcutEl[seciliIdx] = temp;
+                        
+                        seciliIdx = null;
+                        arayuzuGuncelle();
+                        await eliKaydet(); // Veritabanına gönder
+                    }
+                };
+
+                istakaDiv.appendChild(div);
+            });
+        }
+
+        async function eliKaydet() {
+            const user = tg.initDataUnsafe.user;
+            const chat_id = tg.initDataUnsafe.chat_instance || (user ? user.id.toString() : '0');
+            await fetch('/save_hand', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ user_id: user.id, chat_id: chat_id, el: mevcutEl })
+            });
+        }
+
+        window.onload = taslariYukle;
+    </script>
 </body>
 </html>
