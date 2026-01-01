@@ -87,8 +87,7 @@
             if (r.includes('siyah') || r.includes('black')) return 'siyah';
             return 'siyah';
         }
-        // Manuel taşıma sonrası per puanını hesaplayan fonksiyon
-function manuelPuanHesapla() {
+        function manuelPuanHesapla() {
     let toplam = 0;
     let geciciPer = [];
 
@@ -113,23 +112,6 @@ function manuelPuanHesapla() {
 
     document.getElementById('perPuani').innerText = toplam;
 }
-
-// arayuzuGuncelle fonksiyonunun içindeki div.onclick kısmını şu şekilde güncelle:
-div.onclick = async () => {
-    if (seciliIdx === null) {
-        if (mevcutEl[idx]) { seciliIdx = idx; arayuzuGuncelle(); }
-    } else {
-        const temp = mevcutEl[idx];
-        mevcutEl[idx] = mevcutEl[seciliIdx];
-        mevcutEl[seciliIdx] = temp;
-        seciliIdx = null;
-        
-        // Yer değiştirme sonrası hem arayüzü hem de puanı güncelle
-        arayuzuGuncelle();
-        manuelPuanHesapla(); 
-        await eliKaydet();
-    }
-};
 
         async function taslariYukle() {
             const user = tg.initDataUnsafe.user;
@@ -173,17 +155,20 @@ div.onclick = async () => {
                 div.className = `tas ${tas ? renkFormatla(tas.renk) : 'bos'} ${seciliIdx === idx ? 'secili' : ''}`;
                 div.innerText = tas ? tas.sayi : '';
                 div.onclick = async () => {
-                    if (seciliIdx === null) {
-                        if (mevcutEl[idx]) { seciliIdx = idx; arayuzuGuncelle(); }
-                    } else {
-                        const temp = mevcutEl[idx];
-                        mevcutEl[idx] = mevcutEl[seciliIdx];
-                        mevcutEl[seciliIdx] = temp;
-                        seciliIdx = null;
-                        arayuzuGuncelle();
-                        await eliKaydet();
-                    }
-                };
+    if (seciliIdx === null) {
+        if (mevcutEl[idx]) { seciliIdx = idx; arayuzuGuncelle(); }
+    } else {
+        const temp = mevcutEl[idx];
+        mevcutEl[idx] = mevcutEl[seciliIdx];
+        mevcutEl[seciliIdx] = temp;
+        seciliIdx = null;
+        
+        // Yer değiştirme sonrası hem arayüzü hem de puanı güncelle
+        arayuzuGuncelle();
+        manuelPuanHesapla(); 
+        await eliKaydet();
+    }
+};
                 istakaDiv.appendChild(div);
             });
         }
