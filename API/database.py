@@ -18,7 +18,7 @@ def get_connection():
         port="5432"
     )
 
-def oyunu_baslat_db(chat_id, lobi, deste, gosterge):
+def oyunu_baslat_db(chat_id, oyuncular, deste, gosterge, okey):
     conn = get_connection()
     cur = conn.cursor()
     players_data = {str(p['id']): p['hand'] for p in lobi}

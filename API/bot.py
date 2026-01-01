@@ -306,39 +306,24 @@ async def katil(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
     chat_id = update.effective_chat.id
 
-    # 1️⃣ Deste oluştur
     deste = deste_olustur()
-
-    # 2️⃣ Gösterge çek
     gosterge = deste.pop()
-
-    # 3️⃣ Okey belirle
     okey = okey_belirle(gosterge)
 
-    # 4️⃣ Oyuncuya 22 taş dağıt
     hand = [deste.pop() for _ in range(22)]
-
     oyuncular = [{
         "id": user.id,
         "name": user.first_name,
         "hand": hand
     }]
 
-    # 5️⃣ Oyunu DB'de başlat
     try:
-        oyunu_baslat_db(
-            chat_id=chat_id,
-            oyuncular=oyuncular,
-            deste=deste,
-            gosterge=gosterge,
-            okey=okey
-        )
+        oyunu_baslat_db(chat_id, oyuncular, deste, gosterge, okey)
 
         await update.message.reply_text(
-            f"🎴 Oyun başlatıldı!\n\n"
+            f"🎴 Oyun başlatıldı!\n"
             f"🟨 Gösterge: {gosterge['renk']} {gosterge['sayi']}\n"
-            f"⭐ Okey: {okey['renk']} {okey['sayi']}\n\n"
-            f"Panelden oyuna devam edebilirsin 👇"
+            f"⭐ Okey: {okey['renk']} {okey['sayi']}"
         )
 
     except Exception as e:
