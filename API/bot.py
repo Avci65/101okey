@@ -5,7 +5,7 @@ from dotenv import load_dotenv
 from flask import Flask, render_template
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, WebAppInfo
 from telegram.ext import ApplicationBuilder, CommandHandler, ContextTypes, CallbackQueryHandler
-
+from flask import jsonify, request
 # Veritabanı fonksiyonları (Aynı klasörde oldukları varsayılıyor)
 from database import (
     oyunu_baslat_db, sira_kimde, sirayi_degistir, 
@@ -24,7 +24,16 @@ template_dir = os.path.join(os.path.dirname(base_dir), 'templates')
 
 flask_app = Flask(__name__, template_folder=template_dir)
 
-@flask_app.route('/')
+@flask_app.route('/gethand')
+def get_hand():
+    user_id = request.args.get('user_id')
+    chat_id = request.args.get('chat_id')
+    if not user_id or not chat_id:
+        return jsonify({"error": "Eksik parametre"}), 400
+    
+    # Veritabanından gerçek eli çekiyoruz
+    el = oyuncu_eli_getir(int(chat_id), int(user_id))
+    return jsonify(el if el else [])
 def index():
     # Bu satır artık templates/index.html dosyasını bulabilecek
     return render_template('index.html')
