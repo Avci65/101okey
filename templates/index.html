@@ -32,32 +32,41 @@
         tg.expand();
 
         async function taslariYukle() {
-            const user = tg.initDataUnsafe.user;
-            // chat_id undefined gelirse user.id'yi yedek kullan
-            const chat_id = tg.initDataUnsafe.chat_instance || (user ? user.id.toString() : '0');
-            const istakaDiv = document.getElementById('istaka');
+    const tg = window.Telegram.WebApp;
+    const user = tg.initDataUnsafe.user;
+    const chat_id = tg.initDataUnsafe.chat_instance || (user ? user.id.toString() : '0');
+    const istakaDiv = document.getElementById('istaka');
 
-            if (!user) {
-                istakaDiv.innerHTML = '<p style="grid-column: span 11">Kullanıcı verisi yok!</p>';
-                return;
-            }
+    if (!user) return;
 
-            try {
-                const response = await fetch(`/get_hand?user_id=${user.id}&chat_id=${chat_id}`);
-                if (!response.ok) throw new Error();
-                const el = await response.json();
-                
-                istakaDiv.innerHTML = '';
-                el.forEach(tas => {
-                    const div = document.createElement('div');
-                    div.className = `tas ${tas ? tas.renk.toLowerCase() : 'bos'}`;
-                    div.innerText = tas ? tas.sayi : '▫️';
-                    istakaDiv.appendChild(div);
-                });
-            } catch (e) {
-                istakaDiv.innerHTML = '<p style="grid-column: span 11">Taşlar yüklenemedi!</p>';
-            }
+    try {
+        const response = await fetch(`/get_hand?user_id=${user.id}&chat_id=${chat_id}`);
+        const el = await response.json();
+        
+        // Gelen veri boşsa veya hata mesajı içeriyorsa
+        if (!el || el.error || !Array.isArray(el)) {
+            istakaDiv.innerHTML = '<p style="grid-column: span 11">Henüz oyun başlatılmamış!</p>';
+            return;
         }
+
+        istakaDiv.innerHTML = ''; // "Taşlar yüklenemedi" yazısını temizle
+        
+        el.forEach(tas => {
+            const div = document.createElement('div');
+            // Taş objesini ve renk bilgisini kontrol et
+            if (tas && tas.renk) {
+                div.className = `tas ${tas.renk.toLowerCase()}`;
+                div.innerText = tas.sayi;
+            } else {
+                div.className = 'tas bos';
+                div.innerText = '▫️';
+            }
+            istakaDiv.appendChild(div);
+        });
+    } catch (e) {
+        istakaDiv.innerHTML = '<p style="grid-column: span 11">Veri işleme hatası!</p>';
+    }
+}
         window.onload = taslariYukle;
     </script>
 </body>
