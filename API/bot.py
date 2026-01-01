@@ -167,6 +167,7 @@ def discard_tile():
 
     return jsonify({"success": False})
 
+
 @flask_app.route('/draw_tile', methods=['POST'])
 def draw_tile():
     # Oyuncu zaten çektiyse tekrar çekemez
@@ -185,27 +186,7 @@ def draw_tile():
 @flask_app.route('/')
 def index():
     return render_template('index.html')
-@flask_app.route('/discard_tile', methods=['POST'])
-def discard_tile():
-    data = request.json
-    chat_id = int(data["chat_id"])
-    user_id = int(data["user_id"])
-    index = int(data["index"])
 
-    el = oyuncu_eli_getir(chat_id, user_id)
-
-    if index < 0 or index >= len(el):
-        return jsonify({"success": False})
-
-    atilan = el[index]
-    el[index] = None
-
-    oyuncu_eli_guncelle(chat_id, user_id, el)
-
-    # Burada ortaya atılan taşı da kaydedebilirsin
-    # oyun["orta"].append(atilan)
-
-    return jsonify({"success": True})
 
 
 @flask_app.route('/get_hand')
