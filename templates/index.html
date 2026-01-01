@@ -87,6 +87,49 @@
             if (r.includes('siyah') || r.includes('black')) return 'siyah';
             return 'siyah';
         }
+        // Manuel taşıma sonrası per puanını hesaplayan fonksiyon
+function manuelPuanHesapla() {
+    let toplam = 0;
+    let geciciPer = [];
+
+    for (let i = 0; i < mevcutEl.length; i++) {
+        const tas = mevcutEl[i];
+
+        if (tas !== null) {
+            geciciPer.push(tas);
+        } else {
+            // Boşluğa denk gelindiğinde mevcut per grubunu kontrol et
+            if (geciciPer.length >= 3) {
+                // Basitçe per içindeki sayıları topla
+                toplam += geciciPer.reduce((sum, t) => sum + t.sayi, 0);
+            }
+            geciciPer = []; // Grubu sıfırla
+        }
+    }
+    // Listenin sonundaki grubu kontrol et
+    if (geciciPer.length >= 3) {
+        toplam += geciciPer.reduce((sum, t) => sum + t.sayi, 0);
+    }
+
+    document.getElementById('perPuani').innerText = toplam;
+}
+
+// arayuzuGuncelle fonksiyonunun içindeki div.onclick kısmını şu şekilde güncelle:
+div.onclick = async () => {
+    if (seciliIdx === null) {
+        if (mevcutEl[idx]) { seciliIdx = idx; arayuzuGuncelle(); }
+    } else {
+        const temp = mevcutEl[idx];
+        mevcutEl[idx] = mevcutEl[seciliIdx];
+        mevcutEl[seciliIdx] = temp;
+        seciliIdx = null;
+        
+        // Yer değiştirme sonrası hem arayüzü hem de puanı güncelle
+        arayuzuGuncelle();
+        manuelPuanHesapla(); 
+        await eliKaydet();
+    }
+};
 
         async function taslariYukle() {
             const user = tg.initDataUnsafe.user;
