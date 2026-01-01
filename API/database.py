@@ -138,3 +138,51 @@ def oyun_verisi_getir(chat_id):
         "current_turn_id": current_turn_id,
         "is_active": is_active
     }
+def tas_at_db(chat_id, user_id, index):
+    conn = get_connection()
+    cur = conn.cursor()
+
+    cur.execute("""
+        SELECT players
+        FROM games
+        WHERE chat_id = %s
+    """, (chat_id,))
+    players = cur.fetchone()[0]
+
+    el = players.get(str(user_id), [])
+
+    if index < 0 or index >= len(el) or el[index] is None:
+        cur.close()
+        conn.close()
+        return None
+
+    atilan_tas = el[index]
+    el[index] = None
+
+    cur.execute("""
+        UPDATE games
+        SET players = %s, discard = %s
+        WHERE chat_id = %s
+    """, (json.dumps(players), json.dumps(atilan_tas), chat_id))
+
+    conn.commit()
+    cur.close()
+    conn.close()
+
+    return atilan_tas
+def ortaya_atilan_tasi_getir(chat_id):
+    conn = get_connection()
+    cur = conn.cursor()
+
+    cur.execute("""
+        SELECT discard
+        FROM games
+        WHERE chat_id = %s
+    """, (chat_id,))
+
+    res = cur.fetchone()
+    cur.close()
+    conn.close()
+
+    return res[0] if res else None
+

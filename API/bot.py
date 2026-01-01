@@ -149,7 +149,24 @@ def oyuncu_daha_once_acti_mi(chat_id, user_id):
     return user_id in oyun.get("acmis_oyuncular", [])
 
 
+
 # --- FLASK ROTALARI ---
+@flask_app.route('/discard_tile', methods=['POST'])
+def discard_tile():
+    data = request.json
+    chat_id = int(data['chat_id'])
+    user_id = int(data['user_id'])
+    index = int(data['index'])
+
+    from database import tas_at_db
+
+    tas = tas_at_db(chat_id, user_id, index)
+
+    if tas:
+        return jsonify({"success": True, "tas": tas})
+
+    return jsonify({"success": False})
+
 @flask_app.route('/draw_tile', methods=['POST'])
 def draw_tile():
     # Oyuncu zaten çektiyse tekrar çekemez
@@ -193,19 +210,17 @@ def discard_tile():
 
 @flask_app.route('/get_hand')
 def get_hand():
-    user_id = request.args.get('user_id')
-    chat_id = request.args.get('chat_id')
+    user_id = int(request.args.get('user_id'))
+    chat_id = int(request.args.get('chat_id'))
 
-    if not user_id or not chat_id:
-        return jsonify({"error": "Eksik parametre"}), 400
-
-    el = oyuncu_eli_getir(int(chat_id), int(user_id))
-    oyun = oyun_verisi_getir(int(chat_id))
+    el = oyuncu_eli_getir(chat_id, user_id)
+    oyun = oyun_verisi_getir(chat_id)
 
     return jsonify({
-        "el": [renk_normalize_et(t) for t in el] if el else [],
-        "gosterge": oyun.get("gosterge"),
-        "okey": oyun.get("okey")
+        "el": el,
+        "gosterge": oyun["gosterge"],
+        "okey": oyun["okey"],
+        "discard": oyun.get("discard")
     })
 
 

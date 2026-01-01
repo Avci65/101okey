@@ -88,9 +88,14 @@
     <div>
     <div id="gostergeBox" class="tas tas-mini"></div>
 </div>
-
+<div id="okeyBox"></div>
     
 </div>
+<div style="margin:10px 0; text-align:center;">
+    <div style="font-size:11px;color:#aaa">ORTA</div>
+    <div id="discardBox" class="tas tas-mini"></div>
+</div>
+
 
     <div class="istaka-container">
         <div class="istaka" id="istaka"></div>
@@ -263,12 +268,20 @@ async function acabilirMiKontrolEt() {
 async function taslariYukle() {
     const res = await fetch(`/get_hand?user_id=${user.id}&chat_id=${chat_id}`);
     const data = await res.json();
+    const discardBox = document.getElementById("discardBox");
 
     mevcutEl = new Array(30).fill(null);
     data.el.forEach((t, i) => { if (i < 30) mevcutEl[i] = t; });
 
     okeyTas = data.okey;
     gostergeTas = data.gosterge;
+     if (data.discard) {
+    discardBox.innerText = data.discard.sayi;
+    discardBox.className = `tas tas-mini ${renkFormatla(data.discard.renk)}`;
+   } else {
+    discardBox.innerText = "";
+    discardBox.className = "tas tas-mini bos";
+}
 
     // Gösterge & Okey UI
     document.getElementById("gostergeBox").innerText =
