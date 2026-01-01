@@ -174,40 +174,40 @@ function renkFormatla(renk) {
     return 'siyah';
 }
 
-/* ================= PER KONTROL ================= */
 function perGecerliMi(grup) {
     if (grup.length < 3) return false;
 
-    const jokerler = grup.filter(t => t.is_okey);
-    const normal = grup.filter(t => !t.is_okey);
+    const okeyler = grup.filter(t => t.is_okey);
+    const normalTaslar = grup.filter(t => !t.is_okey);
 
-    // Sadece jokerlerden oluşan per
-    if (normal.length === 0) return true;
+    // en az 2 normal taş şart
+    if (normalTaslar.length < 2) return false;
 
-    /* -------- SERİ PER -------- */
-    const ayniRenk = normal.every(t => t.renk === normal[0].renk);
+    /* ================= SERİ PER ================= */
+    const renk = normalTaslar[0].renk;
+    if (normalTaslar.every(t => t.renk === renk)) {
 
-    let sayilar = normal.map(t => t.sayi).sort((a, b) => a - b);
-    let eksik = 0;
+        const sayilar = normalTaslar.map(t => t.sayi).sort((a,b)=>a-b);
 
-    for (let i = 1; i < sayilar.length; i++) {
-        eksik += (sayilar[i] - sayilar[i - 1] - 1);
+        let gerekenOkey = 0;
+        for (let i = 1; i < sayilar.length; i++) {
+            const fark = sayilar[i] - sayilar[i-1];
+            if (fark === 1) continue;
+            if (fark === 2) gerekenOkey += 1;
+            else return false;
+        }
+
+        return gerekenOkey <= okeyler.length;
     }
 
-    if (ayniRenk && eksik <= jokerler.length) {
-        return true;
-    }
+    /* ================= GRUP PER ================= */
+    const sayi = normalTaslar[0].sayi;
+    if (!normalTaslar.every(t => t.sayi === sayi)) return false;
 
-    /* -------- GRUP PER -------- */
-    const ayniSayi = normal.every(t => t.sayi === normal[0].sayi);
-    const farkliRenk = new Set(normal.map(t => t.renk)).size === normal.length;
-
-    if (ayniSayi && farkliRenk && jokerler.length <= 1) {
-        return true;
-    }
-
-    return false;
+    const renkler = new Set(normalTaslar.map(t => t.renk));
+    return renkler.size === normalTaslar.length;
 }
+
 
 
 /* ================= PUAN HESABI ================= */

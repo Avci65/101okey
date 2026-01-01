@@ -127,18 +127,24 @@ def okey_belirle(gosterge):
     if not gosterge: return None
     sayi = gosterge['sayi'] + 1 if gosterge['sayi'] < 13 else 1
     return {'renk': gosterge['renk'], 'sayi': sayi}
-
 def el_analiz_et(el, okey):
     toplam = 0
-    gecerli_grup = []
+    grup = []
+
     for tas in el:
-        if tas is None:
-            if len(gecerli_grup) >= 3: toplam += sum(t['sayi'] for t in gecerli_grup)
-            gecerli_grup = []
+        if tas:
+            grup.append(tas)
         else:
-            gecerli_grup.append(tas)
-    if len(gecerli_grup) >= 3: toplam += sum(t['sayi'] for t in gecerli_grup)
+            if per_gecerli_mi(grup, okey):
+                toplam += sum(t["sayi"] for t in grup if t["sayi"] != okey["sayi"])
+            grup = []
+
+    if per_gecerli_mi(grup, okey):
+        toplam += sum(t["sayi"] for t in grup if t["sayi"] != okey["sayi"])
+
     return toplam
+
+
 
 def oyun_verisi_getir(chat_id):
     conn = get_connection()
@@ -192,6 +198,38 @@ def tas_at_db(chat_id, user_id, index):
     conn.close()
 
     return tas
+def per_gecerli_mi(grup, okey):
+    if len(grup) < 3:
+        return False
+
+    okeyler = [t for t in grup if t["renk"] == okey["renk"] and t["sayi"] == okey["sayi"]]
+    normal = [t for t in grup if t not in okeyler]
+
+    if len(normal) < 2:
+        return False
+
+    # SERİ PER
+    renk = normal[0]["renk"]
+    if all(t["renk"] == renk for t in normal):
+        sayilar = sorted(t["sayi"] for t in normal)
+        gereken = 0
+        for i in range(1, len(sayilar)):
+            fark = sayilar[i] - sayilar[i-1]
+            if fark == 1:
+                continue
+            elif fark == 2:
+                gereken += 1
+            else:
+                return False
+        return gereken <= len(okeyler)
+
+    # GRUP PER
+    sayi = normal[0]["sayi"]
+    if not all(t["sayi"] == sayi for t in normal):
+        return False
+
+    renkler = {t["renk"] for t in normal}
+    return len(renkler) == len(normal)
 
 def ortaya_atilan_tasi_getir(chat_id):
     conn = get_connection()
