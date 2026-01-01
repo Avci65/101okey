@@ -12,13 +12,13 @@
         }
         .header { width: 100%; padding: 8px; text-align: center; font-weight: bold; background: rgba(0,0,0,0.3); color: #00d2ff; font-size: 14px; }
         
-        /* Istaka Yapısı */
+        /* Istaka Alanı */
         .istaka-container { flex-grow: 1; display: flex; align-items: center; width: 100%; justify-content: center; padding: 10px; }
         .istaka { 
             background: linear-gradient(to bottom, #d4a017 0%, #8b4513 100%); 
             width: 98%; max-width: 600px; 
             display: grid; 
-            grid-template-columns: repeat(15, 1fr); /* 15 Sütun */
+            grid-template-columns: repeat(15, 1fr); /* 15 sütunlu profesyonel dizilim */
             grid-template-rows: repeat(2, 1fr); 
             gap: 3px; padding: 6px; 
             border: 3px solid #5d2e0a; border-radius: 6px;
@@ -30,17 +30,17 @@
             background: #fefefe; border-radius: 3px; display: flex; align-items: center; 
             justify-content: center; font-weight: 900; font-size: 1.1rem; height: 45px; 
             box-shadow: inset 0 -3px 0 #d1d1d1, 0 2px 4px rgba(0,0,0,0.4); 
-            position: relative; transition: transform 0.1s;
+            position: relative; transition: transform 0.1s; cursor: pointer;
         }
 
-        /* Renk Sabitleme */
+        /* Renk Sabitleme (Kritik Bölüm) */
         .kirmizi { color: #e74c3c !important; } 
         .mavi { color: #3498db !important; } 
         .siyah { color: #2c3e50 !important; } 
         .sari { color: #f39c12 !important; }
         
         /* Seçili Taş Efekti */
-        .secili { outline: 3px solid gold; z-index: 10; transform: scale(1.05); }
+        .secili { outline: 3px solid gold; z-index: 10; transform: scale(1.1); box-shadow: 0 0 15px gold; }
         .bos { background: rgba(0,0,0,0.15); box-shadow: none; border: 1px solid rgba(255,255,255,0.05); }
 
         .controls { width: 100%; display: flex; justify-content: center; gap: 10px; padding: 15px; background: rgba(0,0,0,0.5); }
@@ -65,14 +65,15 @@
         let mevcutEl = [];
         let seciliIdx = null;
 
-        // Renk ismini temizleyip CSS sınıfına çeviren fonksiyon
-        function renkDuzenle(renk) {
+        // Renk ismini temizleyen ve eşleştiren fonksiyon
+        function renkFormatla(renk) {
             if (!renk) return 'bos';
-            const r = renk.toLowerCase();
-            if (r.includes('kirmizi')) return 'kirmizi';
-            if (r.includes('mavi')) return 'mavi';
-            if (r.includes('siyah')) return 'siyah';
-            if (r.includes('sari')) return 'sari';
+            const r = renk.toLowerCase().trim();
+            // Türkçe karakter ve farklı yazım toleransı
+            if (r.includes('kirmizi') || r.includes('kırmızı') || r.includes('red')) return 'kirmizi';
+            if (r.includes('mavi') || r.includes('blue')) return 'mavi';
+            if (r.includes('sari') || r.includes('sarı') || r.includes('yellow')) return 'sari';
+            if (r.includes('siyah') || r.includes('black')) return 'siyah';
             return 'siyah'; // Varsayılan
         }
 
@@ -84,10 +85,12 @@
                 const response = await fetch(`/get_hand?user_id=${user.id}&chat_id=${chat_id}`);
                 const el = await response.json();
                 
+                // 30 slotluk ıstaka yapısını oluştur
                 mevcutEl = new Array(30).fill(null);
                 if (Array.isArray(el)) {
                     el.forEach((tas, i) => { if(i < 30) mevcutEl[i] = tas; });
                 }
+                seciliIdx = null; // Seçimi sıfırla
                 arayuzuGuncelle();
             } catch (e) {
                 console.error("Yükleme hatası:", e);
@@ -100,8 +103,10 @@
 
             mevcutEl.forEach((tas, idx) => {
                 const div = document.createElement('div');
-                const temizRenk = tas ? renkDuzenle(tas.renk) : 'bos';
-                div.className = `tas ${temizRenk}`;
+                const renkSinifi = tas ? renkFormatla(tas.renk) : 'bos';
+                div.className = `tas ${renkSinifi}`;
+                
+                // Eğer bu taş seçiliyse efekti uygula
                 if (seciliIdx === idx) div.classList.add('secili');
                 
                 div.innerText = tas ? tas.sayi : '';
@@ -109,19 +114,25 @@
                 // Mobil Uyumlu Tıkla-Taşı Sistemi
                 div.onclick = async () => {
                     if (seciliIdx === null) {
-                        if (mevcutEl[idx]) {
+                        // İlk tıklama: Taşı seç
+                        if (mevcutEl[idx] !== null) {
                             seciliIdx = idx;
                             arayuzuGuncelle();
                         }
                     } else {
-                        // Yer değiştirme
+                        // İkinci tıklama: Yer değiştir
                         const temp = mevcutEl[idx];
                         mevcutEl[idx] = mevcutEl[seciliIdx];
                         mevcutEl[seciliIdx] = temp;
                         
+                        const eskiSecili = seciliIdx;
                         seciliIdx = null;
                         arayuzuGuncelle();
-                        await eliKaydet(); // Veritabanına gönder
+                        
+                        // Sadece yer değişikliği olduysa kaydet
+                        if (eskiSecili !== idx) {
+                            await eliKaydet();
+                        }
                     }
                 };
 
@@ -132,11 +143,20 @@
         async function eliKaydet() {
             const user = tg.initDataUnsafe.user;
             const chat_id = tg.initDataUnsafe.chat_instance || (user ? user.id.toString() : '0');
-            await fetch('/save_hand', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ user_id: user.id, chat_id: chat_id, el: mevcutEl })
-            });
+            
+            try {
+                await fetch('/save_hand', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        user_id: user.id,
+                        chat_id: chat_id,
+                        el: mevcutEl
+                    })
+                });
+            } catch (e) {
+                console.error("Kaydetme hatası:", e);
+            }
         }
 
         window.onload = taslariYukle;

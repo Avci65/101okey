@@ -46,15 +46,18 @@ def save_hand():
     data = request.json
     user_id = data.get('user_id')
     chat_id = data.get('chat_id')
-    yeni_el = data.get('el') # 30 slotluk liste
-
-    if not user_id or not chat_id:
+    yeni_el = data.get('el')
+    
+    if not user_id or not chat_id or yeni_el is None:
         return jsonify({"success": False}), 400
-
-    # Veritabanındaki oyuncu elini yeni dizilişle güncelle
-    # Not: Boş slotlar (None) veritabanında saklanabilir veya temizlenebilir
-    oyuncu_eli_guncelle(int(chat_id), int(user_id), yeni_el)
-    return jsonify({"success": True})
+        
+    try:
+        # Kaydederken de veriyi temizleyerek veritabanına gönderiyoruz
+        temiz_el = [renk_normalize_et(tas) for tas in yeni_el]
+        oyuncu_eli_guncelle(int(chat_id), int(user_id), temiz_el)
+        return jsonify({"success": True})
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 500
 def deste_olustur():
     # Okey renklerini tanımlıyoruz
     renkler = ['Kırmızı', 'Mavi', 'Siyah', 'Sarı']
@@ -68,6 +71,22 @@ def deste_olustur():
 def run_flask():
     port = int(os.environ.get("PORT", 8080))
     flask_app.run(host='0.0.0.0', port=port)
+def renk_normalize_et(tas):
+    if not tas:
+        return None
+    
+    renk = tas.get('renk', '').lower()
+    # Türkçe karakter ve büyük harf sorunlarını sunucu tarafında çözüyoruz
+    if 'kirmizi' in renk or 'kırmızı' in renk or 'red' in renk:
+        tas['renk'] = 'kirmizi'
+    elif 'mavi' in renk or 'blue' in renk:
+        tas['renk'] = 'mavi'
+    elif 'sari' in renk or 'sarı' in renk or 'yellow' in renk:
+        tas['renk'] = 'sari'
+    elif 'siyah' in renk or 'black' in renk:
+        tas['renk'] = 'siyah'
+    
+    return tas
 
 # --- BOT KOMUTLARI ---
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
