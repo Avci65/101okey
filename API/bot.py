@@ -26,19 +26,7 @@ flask_app = Flask(__name__, template_folder=template_path)
 
 # --- YARDIMCI FONKSİYONLAR ---
 
-def renk_normalize_et(tas):
-    if not tas:
-        return None
-    renk = str(tas.get('renk', '')).lower()
-    if 'kirmizi' in renk or 'kırmızı' in renk or 'red' in renk:
-        tas['renk'] = 'kirmizi'
-    elif 'mavi' in renk or 'blue' in renk:
-        tas['renk'] = 'mavi'
-    elif 'sari' in renk or 'sarı' in renk or 'yellow' in renk:
-        tas['renk'] = 'sari'
-    elif 'siyah' in renk or 'black' in renk:
-        tas['renk'] = 'siyah'
-    return tas
+
 
 def per_gecerli_mi(grup):
     """Bir taş grubunun 101 kurallarına göre per olup olmadığını denetler."""
@@ -174,15 +162,27 @@ def save_hand():
 @flask_app.route('/auto_sort', methods=['POST'])
 def auto_sort():
     data = request.json
-    try:
-        el = oyuncu_eli_getir(int(data['chat_id']), int(data['user_id']))
-        taslar = [t for t in el if t is not None]
-        # Akıllı per analizi ve puan hesaplama
-        yeni_el, puan = per_analiz_et_mantigi(taslar)
-        oyuncu_eli_guncelle(int(data['chat_id']), int(data['user_id']), yeni_el)
-        return jsonify({"success": True, "yeni_el": yeni_el, "puan": puan})
-    except Exception as e:
-        return jsonify({"success": False, "error": str(e)})
+
+    el = oyuncu_eli_getir(int(data['chat_id']), int(data['user_id']))
+    if not el:
+        return jsonify({"success": False, "error": "El boş"})
+
+    taslar = [renk_normalize_et(t) for t in el if t is not None]
+    taslar = [t for t in taslar if t is not None]
+
+    yeni_el, puan = per_analiz_et_mantigi(taslar)
+
+    # 🔥 RENK GARANTİSİ
+    yeni_el = [renk_normalize_et(t) for t in yeni_el]
+
+    oyuncu_eli_guncelle(int(data['chat_id']), int(data['user_id']), yeni_el)
+
+    return jsonify({
+        "success": True,
+        "yeni_el": yeni_el,
+        "puan": puan
+    })
+
 
 def run_flask():
     port = int(os.environ.get("PORT", 8080))
@@ -209,9 +209,8 @@ def renk_normalize_et(tas):
     if not tas:
         return None
 
-    # EĞER RENK YOKSA HATA
-    if 'renk' not in tas:
-        raise ValueError(f"Taşta renk yok: {tas}")
+    if 'renk' not in tas or 'sayi' not in tas:
+        return None  # bozuk taşı tamamen at
 
     renk = str(tas['renk']).lower()
 
@@ -223,6 +222,8 @@ def renk_normalize_et(tas):
         tas['renk'] = 'sari'
     elif 'siyah' in renk or 'black' in renk:
         tas['renk'] = 'siyah'
+    else:
+        return None  # sahte / bozuk
 
     return tas
 
