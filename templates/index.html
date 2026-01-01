@@ -14,7 +14,7 @@
     </style>
 </head>
 <body>
-    <h3 style="color: #4ca1af;">🎴 101 OKEY PLUS</h3>
+    <h3 style="color: #4ca1af;">🎴AVCİ 101 OKEY </h3>
     <div class="istaka" id="istaka">
         </div>
     <div class="controls">
@@ -48,6 +48,32 @@
             }
         }
         window.onload = eliYukle;
+        async function verileriGetir() {
+    const user = tg.initDataUnsafe.user;
+    // Telegram'ın verdiği benzersiz chat instance'ı kullanıyoruz
+    const chat_id = tg.initDataUnsafe.chat_instance; 
+
+    try {
+        // Flask API'den gerçek veriyi istiyoruz
+        const response = await fetch(`/get_hand?user_id=${user.id}&chat_id=${chat_id}`);
+        const el = await response.json();
+        
+        const istaka = document.getElementById('istaka');
+        istaka.innerHTML = ''; // Eski boşluğu temizle
+
+        el.forEach(tas => {
+            const div = document.createElement('div');
+            // Taş varsa rengine göre sınıf ekle, yoksa boş slot göster
+            div.className = `tas ${tas ? tas.renk.toLowerCase() : 'bos'}`;
+            div.innerText = tas ? tas.sayi : '▫️';
+            istaka.appendChild(div);
+        });
+    } catch (e) {
+        console.error("Veri yükleme hatası:", e);
+    }
+
+}
+window.onload = verileriGetir;
     </script>
 </body>
 </html>

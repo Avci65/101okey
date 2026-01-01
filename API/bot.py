@@ -30,16 +30,12 @@ def index():
 
 @flask_app.route('/get_hand')
 def get_hand():
-    """API: Kullanıcının el verisini JSON olarak döner."""
     user_id = request.args.get('user_id')
     chat_id = request.args.get('chat_id')
-    
     if not user_id or not chat_id:
-        return jsonify({"error": "Eksik parametre"}), 400
-    
+        return jsonify({"error": "Parametre eksik"}), 400
     el = oyuncu_eli_getir(int(chat_id), int(user_id))
     return jsonify(el if el else [])
-
 def run_flask():
     port = int(os.environ.get("PORT", 8080))
     flask_app.run(host='0.0.0.0', port=port)
