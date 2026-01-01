@@ -14,7 +14,7 @@ from database import (
 )
 
 load_dotenv()
-TOKEN = "8238405925:AAGajI_nktIukiRlivYWIEhYlEZp8g-Aas8"
+TOKEN = "8238405925:AAG8ak1cXItdGW4e5RAK4NXGxX8lXeQBWDs"
 
 # --- FLASK VE TEMPLATE AYARLARI ---
 # bot.py'nin bulunduğu dizini alıyoruz (API klasörü)
