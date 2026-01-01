@@ -57,6 +57,24 @@
 </head>
 <body>
     <div class="header">🎴 AVCİ 101 OKEY PLUS</div>
+    <div class="masa-ortasi" style="display: flex; gap: 20px; margin-bottom: 20px; align-items: center;">
+    <div class="kutu" style="text-align: center;">
+        <div style="font-size: 10px; color: #aaa; margin-bottom: 3px;">GÖSTERGE</div>
+        <div id="gostergeTasi" class="tas" style="width: 35px; height: 45px; border: 2px dashed gold;">?</div>
+    </div>
+
+    <div id="deste" onclick="tasCek()" style="cursor: pointer; position: relative;">
+        <div class="tas" style="background: #2c3e50; color: white; border: 2px solid #34495e; width: 40px; height: 50px;">
+            <span style="font-size: 20px;">🎴</span>
+        </div>
+        <div id="kalanTasSayisi" style="position: absolute; top: -10px; right: -10px; background: red; border-radius: 50%; padding: 2px 6px; font-size: 10px;">101</div>
+    </div>
+
+    <div class="kutu" style="text-align: center;">
+        <div style="font-size: 10px; color: #aaa; margin-bottom: 3px;">OKEY</div>
+        <div id="okeyTasi" class="tas" style="width: 35px; height: 45px; background: #f1c40f; color: #d35400;">O</div>
+    </div>
+</div>
     
     <div class="istaka-container">
         <div class="istaka" id="istaka"></div>
@@ -113,6 +131,7 @@
     document.getElementById('perPuani').innerText = toplam;
 
 }
+
 
         async function taslariYukle() {
             const user = tg.initDataUnsafe.user;
@@ -183,6 +202,34 @@ function manuelPuanHesapla() {
                 }
             } catch (e) { console.error("Dizme hatası:", e); }
         }
+        async function tasCek() {
+    const user = tg.initDataUnsafe.user;
+    const chat_id = tg.initDataUnsafe.chat_instance || user.id.toString();
+
+    try {
+        const response = await fetch('/draw_tile', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({ user_id: user.id, chat_id: chat_id })
+        });
+        const data = await response.json();
+
+        if (data.success) {
+            // Çekilen taşı ıstakadaki ilk boşluğa yerleştir
+            const bosIdx = mevcutEl.indexOf(null);
+            if (bosIdx !== -1) {
+                mevcutEl[bosIdx] = data.tas;
+                arayuzuGuncelle();
+                manuelPuanHesapla();
+                await eliKaydet();
+            }
+        } else {
+            alert(data.error || "Taş çekilemedi!");
+        }
+    } catch (e) {
+        console.error("Taş çekme hatası:", e);
+    }
+}
 
         function arayuzuGuncelle() {
             const istakaDiv = document.getElementById('istaka');

@@ -136,7 +136,17 @@ def deste_olustur():
     return deste
 
 # --- FLASK ROTALARI ---
-
+@flask_app.route('/draw_tile', methods=['POST'])
+def draw_tile():
+    data = request.json
+    chat_id, user_id = data['chat_id'], data['user_id']
+    
+    # Veritabanından sıradaki taşı çek
+    tas = tas_cek_db(int(chat_id), int(user_id))
+    
+    if tas:
+        return jsonify({"success": True, "tas": renk_normalize_et(tas)})
+    return jsonify({"success": False, "error": "Deste bitti veya sıra sende değil!"})
 @flask_app.route('/')
 def index():
     return render_template('index.html')
