@@ -92,7 +92,7 @@ const tg = window.Telegram.WebApp;
 tg.ready();
 tg.expand();
 
-/* ================= CHAT ID (ADIM 1) ================= */
+/* ================= CHAT ID ================= */
 const params = new URLSearchParams(window.location.search);
 const chat_id = params.get("chat_id");
 
@@ -118,16 +118,65 @@ function renkFormatla(renk) {
     return 'siyah';
 }
 
+/* ================= PER KONTROL ================= */
+function perGecerliMi(grup) {
+    if (grup.length < 3) return false;
+
+    // Seri per
+    const ayniRenk = grup.every(t => t.renk === grup[0].renk);
+    const ardisik = grup.every((t, i) =>
+        i === 0 || t.sayi === grup[i - 1].sayi + 1
+    );
+    if (ayniRenk && ardisik) return true;
+
+    // Grup per
+    const ayniSayi = grup.every(t => t.sayi === grup[0].sayi);
+    const farkliRenk = new Set(grup.map(t => t.renk)).size === grup.length;
+    if (ayniSayi && farkliRenk) return true;
+
+    return false;
+}
+
+/* ================= PUAN HESABI ================= */
+function perPuaniniHesapla() {
+    let toplam = 0;
+    let geciciPer = [];
+
+    for (let i = 0; i < mevcutEl.length; i++) {
+        const tas = mevcutEl[i];
+
+        if (tas !== null) {
+            geciciPer.push(tas);
+        } else {
+            if (perGecerliMi(geciciPer)) {
+                toplam += geciciPer.reduce((s, t) => s + t.sayi, 0);
+            }
+            geciciPer = [];
+        }
+    }
+
+    if (perGecerliMi(geciciPer)) {
+        toplam += geciciPer.reduce((s, t) => s + t.sayi, 0);
+    }
+
+    document.getElementById("perPuani").innerText = toplam;
+    document.getElementById("puanBox").style.display =
+        toplam > 0 ? "block" : "none";
+}
+
 /* ================= VERİ ÇEK ================= */
 async function taslariYukle() {
     const res = await fetch(`/get_hand?user_id=${user.id}&chat_id=${chat_id}`);
     const el = await res.json();
+
     mevcutEl = new Array(30).fill(null);
     if (Array.isArray(el)) {
         el.forEach((t, i) => { if (i < 30) mevcutEl[i] = t; });
     }
+
     seciliIdx = null;
     arayuzuGuncelle();
+    perPuaniniHesapla();
 }
 
 /* ================= OTO DİZ ================= */
@@ -137,6 +186,7 @@ async function otomatikDiz() {
         headers: {'Content-Type': 'application/json'},
         body: JSON.stringify({ user_id: user.id, chat_id })
     });
+
     const data = await res.json();
     if (data.success) {
         mevcutEl = data.yeni_el;
@@ -158,76 +208,32 @@ async function eliKaydet() {
 function arayuzuGuncelle() {
     const istaka = document.getElementById('istaka');
     istaka.innerHTML = '';
+
     mevcutEl.forEach((tas, idx) => {
         const d = document.createElement('div');
         d.className = `tas ${tas ? renkFormatla(tas.renk) : 'bos'} ${seciliIdx === idx ? 'secili' : ''}`;
         d.innerText = tas ? tas.sayi : '';
+
         d.onclick = async () => {
             if (seciliIdx === null && tas) {
                 seciliIdx = idx;
             } else if (seciliIdx !== null) {
-                [mevcutEl[idx], mevcutEl[seciliIdx]] = [mevcutEl[seciliIdx], mevcutEl[idx]];
+                [mevcutEl[idx], mevcutEl[seciliIdx]] =
+                [mevcutEl[seciliIdx], mevcutEl[idx]];
                 seciliIdx = null;
                 await eliKaydet();
             }
             arayuzuGuncelle();
+            perPuaniniHesapla();
         };
+
         istaka.appendChild(d);
     });
-function perPuaniniHesapla() {
-    let toplam = 0;
-    let geciciPer = [];
-
-    for (let i = 0; i < mevcutEl.length; i++) {
-        const tas = mevcutEl[i];
-
-        if (tas !== null) {
-            geciciPer.push(tas);
-        } else {
-            if (perGecerliMi(geciciPer)) {
-                toplam += geciciPer.reduce((s, t) => s + t.sayi, 0);
-            }
-            geciciPer = [];
-        }
-    }
-
-    // Sondaki per
-    if (perGecerliMi(geciciPer)) {
-        toplam += geciciPer.reduce((s, t) => s + t.sayi, 0);
-    }
-
-    const box = document.getElementById("puanBox");
-    const span = document.getElementById("perPuani");
-
-    span.innerText = toplam;
-
-    box.style.display = toplam > 0 ? "block" : "none";
 }
-}
-function perGecerliMi(grup) {
-    if (grup.length < 3) return false;
-
-    // Seri per
-    const ayniRenk = grup.every(t => t.renk === grup[0].renk);
-    const ardisik = grup.every((t, i) =>
-        i === 0 || t.sayi === grup[i - 1].sayi + 1
-    );
-    if (ayniRenk && ardisik) return true;
-
-    // Grup per
-    const ayniSayi = grup.every(t => t.sayi === grup[0].sayi);
-    const farkliRenk = new Set(grup.map(t => t.renk)).size === grup.length;
-    if (ayniSayi && farkliRenk) return true;
-
-    return false;
-}
-
-
 
 /* ================= BAŞLAT ================= */
-window.onload = () => {
-    taslariYukle().then(perPuaniniHesapla);
-};
+window.onload = taslariYukle;
 </script>
+
 </body>
 </html>
