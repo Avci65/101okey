@@ -31,40 +31,32 @@
         tg.ready();
         tg.expand();
 
-        async function taslariYukle() {
+    async function taslariYukle() {
     const tg = window.Telegram.WebApp;
     const user = tg.initDataUnsafe.user;
-    const chat_id = tg.initDataUnsafe.chat_instance || (user ? user.id.toString() : '0');
+    const chat_id = tg.initDataUnsafe.chat_instance || user.id.toString();
     const istakaDiv = document.getElementById('istaka');
-
-    if (!user) return;
 
     try {
         const response = await fetch(`/get_hand?user_id=${user.id}&chat_id=${chat_id}`);
         const el = await response.json();
         
-        // Gelen veri boşsa veya hata mesajı içeriyorsa
-        if (!el || el.error || !Array.isArray(el)) {
-            istakaDiv.innerHTML = '<p style="grid-column: span 11">Henüz oyun başlatılmamış!</p>';
+        istakaDiv.innerHTML = ''; // Temizle
+
+        if (el.length === 0) {
+            istakaDiv.innerHTML = '<p style="grid-column: span 11; text-align: center;">Oyun başlamadı! Lütfen bota /katil yazın.</p>';
             return;
         }
 
-        istakaDiv.innerHTML = ''; // "Taşlar yüklenemedi" yazısını temizle
-        
         el.forEach(tas => {
             const div = document.createElement('div');
-            // Taş objesini ve renk bilgisini kontrol et
-            if (tas && tas.renk) {
-                div.className = `tas ${tas.renk.toLowerCase()}`;
-                div.innerText = tas.sayi;
-            } else {
-                div.className = 'tas bos';
-                div.innerText = '▫️';
-            }
+            // Taş verisi varsa sınıflandır, yoksa boş slot yap
+            div.className = `tas ${tas ? tas.renk.toLowerCase() : 'bos'}`;
+            div.innerText = tas ? tas.sayi : '▫️';
             istakaDiv.appendChild(div);
         });
     } catch (e) {
-        istakaDiv.innerHTML = '<p style="grid-column: span 11">Veri işleme hatası!</p>';
+        istakaDiv.innerHTML = '<p>Veri çekme hatası!</p>';
     }
 }
         window.onload = taslariYukle;
