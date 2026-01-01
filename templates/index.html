@@ -10,43 +10,50 @@
             color: white; font-family: 'Arial', sans-serif; margin: 0; 
             display: flex; flex-direction: column; align-items: center; height: 100vh; overflow: hidden; 
         }
-        .header { width: 100%; padding: 10px; text-align: center; font-weight: bold; background: rgba(0,0,0,0.3); color: #00d2ff; }
+        .header { width: 100%; padding: 8px; text-align: center; font-weight: bold; background: rgba(0,0,0,0.3); color: #00d2ff; font-size: 14px; }
         
-        /* Istaka Alanı - Referans görsele uygun ahşap/altın tonları */
-        .istaka-container { flex-grow: 1; display: flex; align-items: flex-end; padding-bottom: 50px; width: 100%; justify-content: center; }
+        /* Istaka Konteynırı - Taş boyutlarını dengelemek için küçültüldü */
+        .istaka-container { flex-grow: 1; display: flex; align-items: center; width: 100%; justify-content: center; padding: 10px; }
         .istaka { 
             background: linear-gradient(to bottom, #d4a017 0%, #8b4513 100%); 
-            width: 95%; max-width: 500px; height: 160px; border-radius: 8px; 
-            display: grid; grid-template-columns: repeat(11, 1fr); grid-template-rows: repeat(2, 1fr); 
-            gap: 4px; padding: 8px; border: 3px solid #5d2e0a; box-shadow: 0 10px 30px rgba(0,0,0,0.8);
+            width: 98%; max-width: 600px; 
+            display: grid; 
+            /* 15 Sütun yaparak boşluk alanı açıyoruz */
+            grid-template-columns: repeat(15, 1fr); 
+            grid-template-rows: repeat(2, 1fr); 
+            gap: 3px; padding: 6px; 
+            border: 3px solid #5d2e0a; border-radius: 6px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.8);
         }
 
-        /* Taş Tasarımı - Referans görsele benzer dolgun yapı */
+        /* Taş Boyutları Küçültüldü */
         .tas { 
-            background: #fefefe; border-radius: 4px; display: flex; align-items: center; 
-            justify-content: center; font-weight: 900; font-size: 1.4rem; height: 65px; 
-            box-shadow: inset 0 -5px 0 #d1d1d1, 0 4px 5px rgba(0,0,0,0.4); 
+            background: #fefefe; border-radius: 3px; display: flex; align-items: center; 
+            justify-content: center; font-weight: 900; font-size: 1.1rem; height: 45px; 
+            box-shadow: inset 0 -3px 0 #d1d1d1, 0 2px 4px rgba(0,0,0,0.4); 
             position: relative; cursor: grab; transition: transform 0.1s;
         }
         .tas:active { transform: scale(0.95); cursor: grabbing; }
-        .tas::after { content: ''; position: absolute; bottom: 8px; width: 8px; height: 8px; background: #eee; border-radius: 50%; box-shadow: inset 0 2px 2px rgba(0,0,0,0.2); }
         
-        /* Renkler */
+        /* Renk Kodları */
         .kirmizi { color: #e74c3c; } .mavi { color: #3498db; } .siyah { color: #2c3e50; } .sari { color: #f1c40f; }
-        .bos { background: rgba(0,0,0,0.2); box-shadow: none; border: 1px solid rgba(255,255,255,0.1); }
         
-        .controls { width: 100%; display: flex; justify-content: center; gap: 15px; padding: 15px; background: rgba(0,0,0,0.5); }
-        button { background: #00d2ff; border: none; color: white; padding: 10px 20px; border-radius: 5px; font-weight: bold; }
+        /* Boş Slot Görünümü */
+        .bos { background: rgba(0,0,0,0.15); box-shadow: none; border: 1px solid rgba(255,255,255,0.05); }
+
+        .controls { width: 100%; display: flex; justify-content: center; gap: 10px; padding: 15px; background: rgba(0,0,0,0.5); }
+        button { background: #4ca1af; border: none; color: white; padding: 8px 16px; border-radius: 5px; font-weight: bold; font-size: 13px; }
     </style>
 </head>
 <body>
     <div class="header">🎴 AVCİ 101 OKEY PLUS</div>
     <div class="istaka-container">
-        <div class="istaka" id="istaka"></div>
+        <div class="istaka" id="istaka">
+            </div>
     </div>
     <div class="controls">
         <button onclick="taslariYukle()">🔄 Yenile</button>
-        <button onclick="tg.close()" style="background:#ff4b2b">❌ Kapat</button>
+        <button onclick="window.Telegram.WebApp.close()" style="background:#c0392b">❌ Kapat</button>
     </div>
 
     <script>
@@ -54,38 +61,49 @@
         tg.ready();
         tg.expand();
 
-        let suruklenenTasIdx = null;
+        let mevcutEl = [];
+        let suruklenenIdx = null;
 
         async function taslariYukle() {
             const user = tg.initDataUnsafe.user;
             const chat_id = tg.initDataUnsafe.chat_instance || user.id.toString();
-            const response = await fetch(`/get_hand?user_id=${user.id}&chat_id=${chat_id}`);
-            const el = await response.json();
-            dizIstaka(el);
+            
+            try {
+                const response = await fetch(`/get_hand?user_id=${user.id}&chat_id=${chat_id}`);
+                const el = await response.json();
+                
+                // Gelen eli 30 slotluk bir listeye tamamla (boşluklar için)
+                mevcutEl = new Array(30).fill(null);
+                el.forEach((tas, i) => { if(i < 30) mevcutEl[i] = tas; });
+                
+                arayuzuGuncelle();
+            } catch (e) {
+                console.error("Veri alınamadı");
+            }
         }
 
-        function dizIstaka(el) {
+        function arayuzuGuncelle() {
             const istakaDiv = document.getElementById('istaka');
             istakaDiv.innerHTML = '';
-            el.forEach((tas, idx) => {
+
+            mevcutEl.forEach((tas, idx) => {
                 const div = document.createElement('div');
                 div.className = `tas ${tas ? tas.renk.toLowerCase() : 'bos'}`;
                 div.innerText = tas ? tas.sayi : '';
-                div.draggable = tas ? true : false;
-                
-                // Sürükle-Bırak Olayları
-                div.ondragstart = () => { suruklenenTasIdx = idx; };
+                div.draggable = true;
+
+                // Sürükle-Bırak Mantığı
+                div.ondragstart = () => { suruklenenIdx = idx; };
                 div.ondragover = (e) => e.preventDefault();
-                div.ondrop = () => yerDegistir(idx);
-                
+                div.ondrop = () => {
+                    const temp = mevcutEl[idx];
+                    mevcutEl[idx] = mevcutEl[suruklenenIdx];
+                    mevcutEl[suruklenenIdx] = temp;
+                    arayuzuGuncelle();
+                };
+
                 istakaDiv.appendChild(div);
             });
-        }
-
-        function yerDegistir(hedefIdx) {
-            // Burada frontend'de yer değiştirip sonra sunucuya kaydedebilirsin
-            console.log(`${suruklenenTasIdx} ile ${hedefIdx} yer değişiyor`);
-            // Kaydetme API'si buraya gelecek
         }
 
         window.onload = taslariYukle;
