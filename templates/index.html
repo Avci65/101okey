@@ -90,8 +90,9 @@
     font-size: 13px;
     font-weight: bold;
     border: 1px solid #555;
+    z-index: 9999;
 ">
-</div>
+
 
 
     <div class="controls">
@@ -174,8 +175,9 @@ function perPuaniniHesapla() {
     }
 
     document.getElementById("perPuani").innerText = toplam;
-    document.getElementById("puanBox").style.display =
-        toplam > 0 ? "block" : "none";
+    document.getElementById("puanBox").style.display = "block";
+
+
 }
 async function acabilirMiKontrolEt() {
     const res = await fetch('/can_open', {
