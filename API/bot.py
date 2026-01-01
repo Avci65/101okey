@@ -12,7 +12,13 @@ from database import (
     oyuncu_eli_getir, oyuncu_eli_guncelle, tas_cek_db, 
     okey_belirle, oyun_verisi_getir, el_analiz_et
 )
+# --- FLASK AYARLARI ---
+# Dosyanın bulunduğu klasörü (API) ve bir üstündeki templates klasörünü buluyoruz
+current_dir = os.path.dirname(os.path.abspath(__file__))
+# templates klasörü API klasörü ile aynı seviyedeyse:
+template_path = os.path.join(os.path.dirname(current_dir), 'templates')
 
+flask_app = Flask(__name__, template_folder=template_path)
 load_dotenv()
 TOKEN = "8238405925:AAG8ak1cXItdGW4e5RAK4NXGxX8lXeQBWDs"
 
