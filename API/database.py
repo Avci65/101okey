@@ -21,8 +21,8 @@ def get_connection():
 def oyunu_baslat_db(chat_id, oyuncular, deste, gosterge, okey):
     conn = get_connection()
     cur = conn.cursor()
-    players_data = {str(p['id']): p['hand'] for p in lobi}
-    player_ids = [p['id'] for p in lobi]
+    players_data = {str(p['id']): p['hand'] for p in oyuncular}
+    player_ids = [p['id'] for p in oyuncular]
     
     cur.execute("""
         INSERT INTO games (chat_id, players, current_turn_id, deck, gosterge, is_active)
