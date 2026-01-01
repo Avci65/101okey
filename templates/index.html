@@ -31,16 +31,24 @@
             border-radius: 6px;
         }
         .tas {
-            background: #fff;
-            border-radius: 4px;
-            display: flex; align-items: center; justify-content: center;
-            font-weight: bold; font-size: 18px;
-            height: 45px; cursor: pointer;
-        }
+    background: #fff;
+    border-radius: 6px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: bold;
+    font-size: 18px;
+    height: 45px;
+    cursor: pointer;
+}
+.tas-mini {
+    width: 30px;
+    height: 38px;
+    font-size: 13px;
+}
         .okey {
-    border: 3px solid gold;
-    box-shadow: 0 0 12px gold;
-    background: #fffbe6;
+    box-shadow: 0 0 10px gold;
+    border: 2px solid gold;
 }
 .okey-tas {
     outline: 3px solid gold;
@@ -78,13 +86,10 @@
     <div class="header">🎴 AVCİ 101 OKEY PLUS</div>
 <div style="display:flex; gap:20px; margin-bottom:10px;">
     <div>
-        <div style="font-size:11px;color:#aaa">GÖSTERGE</div>
-        <div id="gostergeBox" class="tas"></div>
-    </div>
-    <div>
-        <div style="font-size:11px;color:#aaa">OKEY</div>
-        <div id="okeyBox" class="tas okey"></div>
-    </div>
+    <div id="gostergeBox" class="tas tas-mini"></div>
+</div>
+
+    
 </div>
 
     <div class="istaka-container">
@@ -168,20 +173,37 @@ function renkFormatla(renk) {
 function perGecerliMi(grup) {
     if (grup.length < 3) return false;
 
-    // Seri per
-    const ayniRenk = grup.every(t => t.renk === grup[0].renk);
-    const ardisik = grup.every((t, i) =>
-        i === 0 || t.sayi === grup[i - 1].sayi + 1
-    );
-    if (ayniRenk && ardisik) return true;
+    const jokerler = grup.filter(t => t.is_okey);
+    const normal = grup.filter(t => !t.is_okey);
 
-    // Grup per
-    const ayniSayi = grup.every(t => t.sayi === grup[0].sayi);
-    const farkliRenk = new Set(grup.map(t => t.renk)).size === grup.length;
-    if (ayniSayi && farkliRenk) return true;
+    // Sadece jokerlerden oluşan per
+    if (normal.length === 0) return true;
+
+    /* -------- SERİ PER -------- */
+    const ayniRenk = normal.every(t => t.renk === normal[0].renk);
+
+    let sayilar = normal.map(t => t.sayi).sort((a, b) => a - b);
+    let eksik = 0;
+
+    for (let i = 1; i < sayilar.length; i++) {
+        eksik += (sayilar[i] - sayilar[i - 1] - 1);
+    }
+
+    if (ayniRenk && eksik <= jokerler.length) {
+        return true;
+    }
+
+    /* -------- GRUP PER -------- */
+    const ayniSayi = normal.every(t => t.sayi === normal[0].sayi);
+    const farkliRenk = new Set(normal.map(t => t.renk)).size === normal.length;
+
+    if (ayniSayi && farkliRenk && jokerler.length <= 1) {
+        return true;
+    }
 
     return false;
 }
+
 
 /* ================= PUAN HESABI ================= */
 function perPuaniniHesapla() {
@@ -301,19 +323,25 @@ function arayuzuGuncelle() {
         const d = document.createElement('div');
 
        let ekstra = "";
-if (
-    tas &&
-    okeyTas &&
-    tas.renk === okeyTas.renk &&
-    tas.sayi === okeyTas.sayi
-) {
-    ekstra = "okey-tas";
+let text = "";
+
+if (tas) {
+    if (
+        okeyTas &&
+        tas.renk === okeyTas.renk &&
+        tas.sayi === okeyTas.sayi
+    ) {
+        ekstra = "okey-tas";
+        text = "⭐";           // 👈 Joker belli
+        tas.is_okey = true;   // 👈 Mantık için işaret
+    } else {
+        tas.is_okey = false;
+        text = tas.sayi;
+    }
 }
 
 d.className = `tas ${tas ? renkFormatla(tas.renk) : 'bos'} ${ekstra}`;
-
-
-        d.innerText = tas ? tas.sayi : '';
+d.innerText = text;
 
         d.onclick = async () => {
 
