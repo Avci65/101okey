@@ -116,8 +116,25 @@ def el_analiz_et(el, okey):
 def oyun_verisi_getir(chat_id):
     conn = get_connection()
     cur = conn.cursor()
-    cur.execute("SELECT gosterge FROM games WHERE chat_id = %s", (chat_id,))
-    res = cur.fetchone()
+    cur.execute("""
+        SELECT players, deck, gosterge, okey, current_turn_id, is_active
+        FROM games
+        WHERE chat_id = %s
+    """, (chat_id,))
+    row = cur.fetchone()
     cur.close()
     conn.close()
-    return res if res else None
+
+    if not row:
+        return None
+
+    players, deck, gosterge, okey, current_turn_id, is_active = row
+
+    return {
+        "players": players,
+        "deck": deck,
+        "gosterge": gosterge,
+        "okey": okey,
+        "current_turn_id": current_turn_id,
+        "is_active": is_active
+    }
