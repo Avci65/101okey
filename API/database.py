@@ -124,9 +124,16 @@ def sirayi_degistir(chat_id):
     conn.close()
 
 def okey_belirle(gosterge):
-    if not gosterge: return None
+    if not gosterge:
+        return None
+
     sayi = gosterge['sayi'] + 1 if gosterge['sayi'] < 13 else 1
-    return {'renk': gosterge['renk'], 'sayi': sayi}
+    return {
+        "renk": gosterge["renk"],
+        "sayi": sayi,
+        "type": "real_okey"
+    }
+
 def el_analiz_et(el, okey):
     toplam = 0
     grup = []

@@ -5,6 +5,7 @@ from dotenv import load_dotenv
 from flask import Flask, render_template, jsonify, request
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, WebAppInfo
 from telegram.ext import ApplicationBuilder, CommandHandler, ContextTypes, CallbackQueryHandler
+from database import get_connection
 
 # Veritabanı fonksiyonları
 from database import (
@@ -118,12 +119,30 @@ def per_analiz_et_mantigi(taslar):
         
     return sonuc_istaka[:30], toplam_puan
 
-def deste_olustur():
+def deste_olustur(okey):
     renkler = ['kirmizi', 'mavi', 'siyah', 'sari']
-    deste = [{'renk': r, 'sayi': s} for r in renkler for s in range(1, 14)] * 2
-    deste.extend([{'renk': 'sahte', 'sayi': 0}] * 2)
+    deste = []
+
+    for r in renkler:
+        for s in range(1, 14):
+            deste.append({"renk": r, "sayi": s, "type": "normal"})
+            deste.append({"renk": r, "sayi": s, "type": "normal"})
+
+    # 2 adet SAHTE OKEY
+    deste.append({
+        "renk": okey["renk"],
+        "sayi": okey["sayi"],
+        "type": "fake_okey"
+    })
+    deste.append({
+        "renk": okey["renk"],
+        "sayi": okey["sayi"],
+        "type": "fake_okey"
+    })
+
     random.shuffle(deste)
     return deste
+
 def okey_belirle(gosterge):
     # Gösterge 13 ise okey 1 olur
     if gosterge["sayi"] == 13:
@@ -191,24 +210,31 @@ def index():
 
 @flask_app.route('/get_hand')
 def get_hand():
-    user_id = request.args.get('user_id')
-    chat_id = request.args.get('chat_id')
+    user_id = request.args.get("user_id")
+    chat_id = request.args.get("chat_id")
 
-    if not user_id or not chat_id:
-        return jsonify({"error": "Eksik parametre"}), 400
+    conn = get_connection()
+    cur = conn.cursor()
 
-    oyun = oyun_verisi_getir(int(chat_id))
+    cur.execute("""
+        SELECT players, gosterge, okey
+        FROM games
+        WHERE chat_id = %s
+    """, (chat_id,))
 
-    if not oyun:
-        return jsonify({"error": "Oyun bulunamadı"}), 404
+    row = cur.fetchone()
+    cur.close()
+    conn.close()
 
-    el = oyun["players"].get(str(user_id), [])
+    if not row:
+        return jsonify({})
+
+    players, gosterge, okey = row
 
     return jsonify({
-        "el": el,
-        "gosterge": oyun["gosterge"],
-        "okey": oyun["okey"],
-        "discard": oyun["discard"]
+        "el": players.get(str(user_id), []),
+        "gosterge": gosterge,
+        "okey": okey
     })
 
 
@@ -314,9 +340,9 @@ async def katil(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
     chat_id = update.effective_chat.id
 
-    deste = deste_olustur()
     gosterge = deste.pop()
     okey = okey_belirle(gosterge)
+    deste = deste_olustur(okey)
 
     hand = [deste.pop() for _ in range(22)]
     oyuncular = [{

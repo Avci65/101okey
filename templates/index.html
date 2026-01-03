@@ -21,6 +21,16 @@
             flex-grow: 1; display: flex; justify-content: center;
             align-items: center; width: 100%; padding: 10px;
         }
+        .fake-okey::after {
+    content: "A";
+    position: absolute;
+    top: 4px;
+    right: 5px;
+    font-size: 11px;
+    font-weight: bold;
+    color: #c0392b;
+}
+
         .istaka {
             background: linear-gradient(to bottom, #d4a017, #8b4513);
             width: 98%; max-width: 600px;
@@ -377,8 +387,12 @@ if (tas) {
         text = tas.sayi;
     }
 }
+let extra = "";
+if (tas?.type === "fake_okey") {
+    extra = "fake-okey";
+}
 
-d.className = `tas ${tas ? renkFormatla(tas.renk) : 'bos'} ${ekstra}`;
+d.className = `tas ${tas ? renkFormatla(tas.renk) : 'bos'} ${extra}`;
 d.innerText = text;
 
         d.onclick = async () => {
