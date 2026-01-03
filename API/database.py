@@ -2,7 +2,7 @@ import psycopg2
 import json
 import os
 from dotenv import load_dotenv
-from bot import random 
+import random 
 
 load_dotenv()
 
