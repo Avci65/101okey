@@ -119,6 +119,39 @@ def per_analiz_et_mantigi(taslar):
         
     return sonuc_istaka[:30], toplam_puan
 
+def deste_olustur(okey_tas):
+    """
+    106 taş üretir:
+    - 4 renk × 13 sayı × 2 = 104
+    - 2 adet sahte okey (okey taşının aynısı, is_fake_okey=True)
+    """
+
+    renkler = ["kirmizi", "mavi", "siyah", "sari"]
+    deste = []
+
+    # Normal taşlar
+    for renk in renkler:
+        for sayi in range(1, 14):
+            for _ in range(2):
+                deste.append({
+                    "renk": renk,
+                    "sayi": sayi,
+                    "is_okey": False,
+                    "is_fake_okey": False
+                })
+
+    # 2 adet SAHTE OKEY (okey taşının aynısı)
+    for _ in range(2):
+        deste.append({
+            "renk": okey_tas["renk"],
+            "sayi": okey_tas["sayi"],
+            "is_okey": False,
+            "is_fake_okey": True
+        })
+
+    random.shuffle(deste)
+    return deste
+
 
 def okey_belirle(gosterge):
     # Gösterge 13 ise okey 1 olur
@@ -314,41 +347,46 @@ def renk_normalize_et(tas):
 
 
 async def katil(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    user = update.effective_user
-    chat_id = update.effective_chat.id
-
     try:
-        # 1️⃣ DESTE HER ZAMAN OLUŞTURULUR
-        deste = deste_olustur()
+        user = update.effective_user
+        chat_id = update.effective_chat.id
 
-        # 2️⃣ GÖSTERGE
-        gosterge = deste.pop()
+        # 1️⃣ Gösterge çek (geçici normal deste)
+        gecici_deste = []
+        renkler = ["kirmizi", "mavi", "siyah", "sari"]
+        for renk in renkler:
+            for sayi in range(1, 14):
+                for _ in range(2):
+                    gecici_deste.append({"renk": renk, "sayi": sayi})
 
-        # 3️⃣ OKEY = GÖSTERGENİN BİR SONRAKİSİ
+        random.shuffle(gecici_deste)
+        gosterge = gecici_deste.pop()
+
+        # 2️⃣ Okey belirle
         okey = okey_belirle(gosterge)
 
-        # 4️⃣ 22 TAŞ DAĞIT
-        hand = [deste.pop() for _ in range(22)]
+        # 3️⃣ GERÇEK DESTEYİ OLUŞTUR (106 taş)
+        deste = deste_olustur(okey)
 
-        oyuncular = [{
-            "id": user.id,
-            "name": user.first_name,
-            "hand": hand
-        }]
+        # 4️⃣ Oyuncuya 21 taş ver
+        hand = [deste.pop() for _ in range(21)]
 
-        # 5️⃣ VERİTABANINA KAYDET
+        # 5️⃣ DB’ye yaz
         oyunu_baslat_db(
             chat_id=chat_id,
-            oyuncular=oyuncular,
+            oyuncular=[{
+                "id": user.id,
+                "name": user.first_name,
+                "hand": hand
+            }],
             deste=deste,
             gosterge=gosterge,
             okey=okey
         )
 
-        # 6️⃣ TELEGRAM MESAJI
         await update.message.reply_text(
-            f"🚩 Oyun başlatıldı!\n"
-            f"🟨 Gösterge: {gosterge['renk']} {gosterge['sayi']}\n"
+            f"🟡 Oyun başlatıldı!\n"
+            f"🎴 Gösterge: {gosterge['renk']} {gosterge['sayi']}\n"
             f"⭐ Okey: {okey['renk']} {okey['sayi']}"
         )
 
