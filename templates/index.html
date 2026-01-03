@@ -213,30 +213,55 @@ function perGecerliMi(grup) {
 /* ================= PUAN HESABI ================= */
 function perPuaniniHesapla() {
     let toplam = 0;
-    let geciciPer = [];
+    let grup = [];
+
+    function grupPuani(grup) {
+        if (!perGecerliMi(grup)) return 0;
+
+        let puan = 0;
+
+        // OKEY hangi sayıyı temsil ediyor?
+        const normal = grup.filter(t => !t.is_okey);
+        const okeyler = grup.filter(t => t.is_okey);
+
+        if (normal.length < 2) return 0;
+
+        // seri per
+        if (normal.every(t => t.renk === normal[0].renk)) {
+            const sayilar = normal.map(t => t.sayi).sort((a,b)=>a-b);
+
+            // eksik sayıları doldur
+            for (let i = 0; i < sayilar.length - 1; i++) {
+                puan += sayilar[i];
+                if (sayilar[i+1] - sayilar[i] === 2 && okeyler.length > 0) {
+                    puan += sayilar[i] + 1; // okeyin temsil ettiği sayı
+                }
+            }
+            puan += sayilar[sayilar.length - 1];
+            return puan;
+        }
+
+        // grup per
+        const sayi = normal[0].sayi;
+        puan = sayi * (normal.length + okeyler.length);
+        return puan;
+    }
 
     for (let i = 0; i < mevcutEl.length; i++) {
-        const tas = mevcutEl[i];
-
-        if (tas !== null) {
-            geciciPer.push(tas);
+        if (mevcutEl[i]) {
+            grup.push(mevcutEl[i]);
         } else {
-            if (perGecerliMi(geciciPer)) {
-                toplam += geciciPer.reduce((s, t) => s + t.sayi, 0);
-            }
-            geciciPer = [];
+            toplam += grupPuani(grup);
+            grup = [];
         }
     }
 
-    if (perGecerliMi(geciciPer)) {
-        toplam += geciciPer.reduce((s, t) => s + t.sayi, 0);
-    }
+    toplam += grupPuani(grup);
 
     document.getElementById("perPuani").innerText = toplam;
     document.getElementById("puanBox").style.display = "block";
-
-
 }
+
 async function acabilirMiKontrolEt() {
     const res = await fetch('/can_open', {
         method: 'POST',

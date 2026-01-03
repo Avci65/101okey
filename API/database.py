@@ -131,17 +131,39 @@ def el_analiz_et(el, okey):
     toplam = 0
     grup = []
 
+    def grup_puani(grup):
+        if not per_gecerli_mi(grup, okey):
+            return 0
+
+        normal = [t for t in grup if t != okey]
+        okeyler = [t for t in grup if t == okey]
+
+        if len(normal) < 2:
+            return 0
+
+        # seri per
+        if all(t["renk"] == normal[0]["renk"] for t in normal):
+            sayilar = sorted(t["sayi"] for t in normal)
+            puan = sum(sayilar)
+
+            for i in range(len(sayilar)-1):
+                if sayilar[i+1] - sayilar[i] == 2 and okeyler:
+                    puan += sayilar[i] + 1
+
+            return puan
+
+        # grup per
+        sayi = normal[0]["sayi"]
+        return sayi * (len(normal) + len(okeyler))
+
     for tas in el:
         if tas:
             grup.append(tas)
         else:
-            if per_gecerli_mi(grup, okey):
-                toplam += sum(t["sayi"] for t in grup if t["sayi"] != okey["sayi"])
+            toplam += grup_puani(grup)
             grup = []
 
-    if per_gecerli_mi(grup, okey):
-        toplam += sum(t["sayi"] for t in grup if t["sayi"] != okey["sayi"])
-
+    toplam += grup_puani(grup)
     return toplam
 
 
