@@ -340,29 +340,44 @@ async def katil(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
     chat_id = update.effective_chat.id
 
-    gosterge = deste.pop()
-    okey = okey_belirle(gosterge)
-    deste = deste_olustur(okey)
-
-    hand = [deste.pop() for _ in range(22)]
-    oyuncular = [{
-        "id": user.id,
-        "name": user.first_name,
-        "hand": hand
-    }]
-
     try:
-        oyunu_baslat_db(chat_id, oyuncular, deste, gosterge, okey)
+        # 1️⃣ DESTE HER ZAMAN OLUŞTURULUR
+        deste = deste_olustur()
 
+        # 2️⃣ GÖSTERGE
+        gosterge = deste.pop()
+
+        # 3️⃣ OKEY = GÖSTERGENİN BİR SONRAKİSİ
+        okey = okey_belirle(gosterge)
+
+        # 4️⃣ 22 TAŞ DAĞIT
+        hand = [deste.pop() for _ in range(22)]
+
+        oyuncular = [{
+            "id": user.id,
+            "name": user.first_name,
+            "hand": hand
+        }]
+
+        # 5️⃣ VERİTABANINA KAYDET
+        oyunu_baslat_db(
+            chat_id=chat_id,
+            oyuncular=oyuncular,
+            deste=deste,
+            gosterge=gosterge,
+            okey=okey
+        )
+
+        # 6️⃣ TELEGRAM MESAJI
         await update.message.reply_text(
-            f"🎴 Oyun başlatıldı!\n"
+            f"🚩 Oyun başlatıldı!\n"
             f"🟨 Gösterge: {gosterge['renk']} {gosterge['sayi']}\n"
             f"⭐ Okey: {okey['renk']} {okey['sayi']}"
         )
 
     except Exception as e:
-        await update.message.reply_text("❌ Oyun başlatılırken hata oluştu.")
         print("KATIL HATASI:", e)
+        await update.message.reply_text("❌ Oyun başlatılırken hata oluştu.")
 
 
 if __name__ == '__main__':
