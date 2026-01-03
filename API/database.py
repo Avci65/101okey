@@ -2,6 +2,7 @@ import psycopg2
 import json
 import os
 from dotenv import load_dotenv
+from bot import random 
 
 load_dotenv()
 
@@ -60,6 +61,22 @@ def oyunu_baslat_db(chat_id, oyuncular, deste, gosterge, okey):
     conn.commit()
     cur.close()
     conn.close()
+def deste_olustur():
+     renkler = ["kirmizi", "mavi", "siyah", "sari"]
+     deste = []
+
+    # 1–13 her renkten 2 adet
+     for _ in range(2):
+        for renk in renkler:
+            for sayi in range(1, 14):
+                deste.append({"renk": renk, "sayi": sayi})
+
+    # 2 adet sahte okey
+     deste.append({"renk": "sahte", "sayi": 0})
+     deste.append({"renk": "sahte", "sayi": 0})
+
+     random.shuffle(deste)
+     return deste
 
 
 def oyuncu_eli_getir(chat_id, user_id):

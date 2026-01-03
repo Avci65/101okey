@@ -119,29 +119,6 @@ def per_analiz_et_mantigi(taslar):
         
     return sonuc_istaka[:30], toplam_puan
 
-def deste_olustur(okey):
-    renkler = ['kirmizi', 'mavi', 'siyah', 'sari']
-    deste = []
-
-    for r in renkler:
-        for s in range(1, 14):
-            deste.append({"renk": r, "sayi": s, "type": "normal"})
-            deste.append({"renk": r, "sayi": s, "type": "normal"})
-
-    # 2 adet SAHTE OKEY
-    deste.append({
-        "renk": okey["renk"],
-        "sayi": okey["sayi"],
-        "type": "fake_okey"
-    })
-    deste.append({
-        "renk": okey["renk"],
-        "sayi": okey["sayi"],
-        "type": "fake_okey"
-    })
-
-    random.shuffle(deste)
-    return deste
 
 def okey_belirle(gosterge):
     # Gösterge 13 ise okey 1 olur
