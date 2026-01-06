@@ -187,36 +187,26 @@ function renkFormatla(renk) {
 function perGecerliMi(grup) {
     if (grup.length < 3) return false;
 
-    const okeyler = grup.filter(t => t.is_okey);
-    const normalTaslar = grup.filter(t => !t.is_okey);
+    // ❌ SAHTE OKEY JOKER DEĞİL
+    // Normal taş gibi davranır
 
-    // en az 2 normal taş şart
-    if (normalTaslar.length < 2) return false;
+    // 🔹 SERİ PER (aynı renk, ardışık)
+    const ayniRenk = grup.every(t => t.renk === grup[0].renk);
+    const ardisik = grup.every((t, i) =>
+        i === 0 || t.sayi === grup[i - 1].sayi + 1
+    );
 
-    /* ================= SERİ PER ================= */
-    const renk = normalTaslar[0].renk;
-    if (normalTaslar.every(t => t.renk === renk)) {
+    if (ayniRenk && ardisik) return true;
 
-        const sayilar = normalTaslar.map(t => t.sayi).sort((a,b)=>a-b);
+    // 🔹 GRUP PER (aynı sayı, farklı renk)
+    const ayniSayi = grup.every(t => t.sayi === grup[0].sayi);
+    const farkliRenk = new Set(grup.map(t => t.renk)).size === grup.length;
 
-        let gerekenOkey = 0;
-        for (let i = 1; i < sayilar.length; i++) {
-            const fark = sayilar[i] - sayilar[i-1];
-            if (fark === 1) continue;
-            if (fark === 2) gerekenOkey += 1;
-            else return false;
-        }
+    if (ayniSayi && farkliRenk) return true;
 
-        return gerekenOkey <= okeyler.length;
-    }
-
-    /* ================= GRUP PER ================= */
-    const sayi = normalTaslar[0].sayi;
-    if (!normalTaslar.every(t => t.sayi === sayi)) return false;
-
-    const renkler = new Set(normalTaslar.map(t => t.renk));
-    return renkler.size === normalTaslar.length;
+    return false;
 }
+
 
 
 
@@ -370,41 +360,38 @@ function arayuzuGuncelle() {
     mevcutEl.forEach((tas, idx) => {
         const d = document.createElement('div');
 
-       let ekstra = "";
-let text = "";
+        let ekstra = "";
 
-if (tas) {
-    if (
-        okeyTas &&
-        tas.renk === okeyTas.renk &&
-        tas.sayi === okeyTas.sayi
-    ) {
-        ekstra = "okey-tas";
-        text = "⭐";           // 👈 Joker belli
-        tas.is_okey = true;   // 👈 Mantık için işaret
-    } else {
-        tas.is_okey = false;
-        text = tas.sayi;
-    }
-}
-let extra = "";
-if (tas?.type === "fake_okey") {
-    extra = "fake-okey";
-}
+        // ✅ SADECE GERÇEK OKEY PARLAR
+        if (
+            tas &&
+            okeyTas &&
+            !tas.sahte &&
+            tas.renk === okeyTas.renk &&
+            tas.sayi === okeyTas.sayi
+        ) {
+            ekstra = "okey-tas";
+        }
 
-d.className = `tas ${tas ? renkFormatla(tas.renk) : 'bos'} ${extra}`;
-d.innerText = text;
+        d.className = `tas ${tas ? renkFormatla(tas.renk) : 'bos'} ${ekstra}`;
+
+        // ✅ SAHTE OKEY = A HARFİ
+        if (tas?.sahte) {
+            d.innerText = "A";
+        } else {
+            d.innerText = tas ? tas.sayi : "";
+        }
 
         d.onclick = async () => {
 
-            // 1️⃣ Hiç seçim yoksa → taşı seç
+            // 1️⃣ İlk tıklama → seç
             if (seciliIdx === null && tas) {
                 seciliIdx = idx;
                 arayuzuGuncelle();
                 return;
             }
 
-            // 2️⃣ Aynı taşa tekrar tıklandıysa → TAŞ AT
+            // 2️⃣ Aynı taşa tekrar tık → AT
             if (seciliIdx === idx && tas) {
                 const onay = confirm("Bu taşı atmak istiyor musun?");
                 if (!onay) return;
@@ -428,11 +415,10 @@ d.innerText = text;
                     perPuaniniHesapla();
                     acabilirMiKontrolEt();
                 }
-
                 return;
             }
 
-            // 3️⃣ Başka bir taşa tıklandıysa → yer değiştir
+            // 3️⃣ Yer değiştir
             if (seciliIdx !== null) {
                 [mevcutEl[idx], mevcutEl[seciliIdx]] =
                     [mevcutEl[seciliIdx], mevcutEl[idx]];

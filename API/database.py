@@ -61,22 +61,29 @@ def oyunu_baslat_db(chat_id, oyuncular, deste, gosterge, okey):
     conn.commit()
     cur.close()
     conn.close()
-def deste_olustur():
-     renkler = ["kirmizi", "mavi", "siyah", "sari"]
-     deste = []
+def deste_olustur(okey):
+    deste = []
 
-    # 1–13 her renkten 2 adet
-     for _ in range(2):
-        for renk in renkler:
-            for sayi in range(1, 14):
-                deste.append({"renk": renk, "sayi": sayi})
+    for renk in ["kirmizi", "mavi", "sari", "siyah"]:
+        for sayi in range(1, 14):
+            deste.append({"renk": renk, "sayi": sayi})
+            deste.append({"renk": renk, "sayi": sayi})
 
     # 2 adet sahte okey
-     deste.append({"renk": "sahte", "sayi": 0})
-     deste.append({"renk": "sahte", "sayi": 0})
+    deste.append({
+        "renk": okey["renk"],
+        "sayi": okey["sayi"],
+        "sahte": True
+    })
+    deste.append({
+        "renk": okey["renk"],
+        "sayi": okey["sayi"],
+        "sahte": True
+    })
 
-     random.shuffle(deste)
-     return deste
+    random.shuffle(deste)
+    return deste
+
 
 
 def oyuncu_eli_getir(chat_id, user_id):
