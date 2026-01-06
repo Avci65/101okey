@@ -187,25 +187,52 @@ function renkFormatla(renk) {
 function perGecerliMi(grup) {
     if (grup.length < 3) return false;
 
-    // ❌ SAHTE OKEY JOKER DEĞİL
-    // Normal taş gibi davranır
+    // 🔹 Gerçek okeyleri ayır
+    const gercekOkeyler = grup.filter(
+        t => !t.sahte && okeyTas &&
+             t.renk === okeyTas.renk &&
+             t.sayi === okeyTas.sayi
+    ).length;
 
-    // 🔹 SERİ PER (aynı renk, ardışık)
-    const ayniRenk = grup.every(t => t.renk === grup[0].renk);
-    const ardisik = grup.every((t, i) =>
-        i === 0 || t.sayi === grup[i - 1].sayi + 1
+    // 🔹 Okey olmayan taşlar
+    const normalTaslar = grup.filter(
+        t => !(okeyTas && !t.sahte &&
+               t.renk === okeyTas.renk &&
+               t.sayi === okeyTas.sayi)
     );
 
-    if (ayniRenk && ardisik) return true;
+    // 🔸 SERİ PER
+    if (normalTaslar.length >= 1) {
+        const renk = normalTaslar[0].renk;
+        const sayilar = normalTaslar.map(t => t.sayi).sort((a,b)=>a-b);
 
-    // 🔹 GRUP PER (aynı sayı, farklı renk)
-    const ayniSayi = grup.every(t => t.sayi === grup[0].sayi);
-    const farkliRenk = new Set(grup.map(t => t.renk)).size === grup.length;
+        let eksik = 0;
+        for (let i = 1; i < sayilar.length; i++) {
+            eksik += (sayilar[i] - sayilar[i - 1] - 1);
+        }
 
-    if (ayniSayi && farkliRenk) return true;
+        if (
+            normalTaslar.every(t => t.renk === renk) &&
+            eksik <= gercekOkeyler
+        ) {
+            return true;
+        }
+    }
+
+    // 🔸 GRUP PER
+    const sayi = normalTaslar[0]?.sayi;
+    const renkler = new Set(normalTaslar.map(t => t.renk));
+
+    if (
+        normalTaslar.every(t => t.sayi === sayi) &&
+        (renkler.size + gercekOkeyler) >= 3
+    ) {
+        return true;
+    }
 
     return false;
 }
+
 
 
 
