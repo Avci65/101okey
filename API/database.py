@@ -61,29 +61,32 @@ def oyunu_baslat_db(chat_id, oyuncular, deste, gosterge, okey):
     conn.commit()
     cur.close()
     conn.close()
-def deste_olustur(okey):
+def deste_olustur():
+    renkler = ["kirmizi", "mavi", "siyah", "sari"]
     deste = []
 
-    for renk in ["kirmizi", "mavi", "sari", "siyah"]:
+    # 4 renk × 13 sayı × 2 = 104 taş
+    for renk in renkler:
         for sayi in range(1, 14):
-            deste.append({"renk": renk, "sayi": sayi})
-            deste.append({"renk": renk, "sayi": sayi})
+            for _ in range(2):
+                deste.append({
+                    "renk": renk,
+                    "sayi": sayi,
+                    "isOkey": False,
+                    "isFakeOkey": False
+                })
 
-    # 2 adet sahte okey
-    deste.append({
-        "renk": okey["renk"],
-        "sayi": okey["sayi"],
-        "sahte": True
-    })
-    deste.append({
-        "renk": okey["renk"],
-        "sayi": okey["sayi"],
-        "sahte": True
-    })
+    # 2 adet SAHTE OKEY
+    for _ in range(2):
+        deste.append({
+            "renk": "sahte",
+            "sayi": 0,
+            "isOkey": False,
+            "isFakeOkey": True
+        })
 
     random.shuffle(deste)
     return deste
-
 
 
 def oyuncu_eli_getir(chat_id, user_id):
@@ -110,21 +113,30 @@ def oyuncu_eli_guncelle(chat_id, user_id, yeni_el):
     conn.commit()
     cur.close()
     conn.close()
-
 def tas_cek_db(chat_id, user_id):
     conn = get_connection()
     cur = conn.cursor()
+
     cur.execute("SELECT deck, players FROM games WHERE chat_id = %s", (chat_id,))
     deck, players = cur.fetchone()
-    if not deck: return None, None
+
     cekilen = deck.pop()
+
+    # 🔥 FLAG'LER KORUNUR
     players[str(user_id)].append(cekilen)
-    cur.execute("UPDATE games SET deck = %s, players = %s WHERE chat_id = %s", 
-                (json.dumps(deck), json.dumps(players), chat_id))
+
+    cur.execute("""
+        UPDATE games 
+        SET deck = %s, players = %s 
+        WHERE chat_id = %s
+    """, (json.dumps(deck), json.dumps(players), chat_id))
+
     conn.commit()
     cur.close()
     conn.close()
-    return cekilen, players[str(user_id)]
+
+    return cekilen
+
 
 def sira_kimde(chat_id):
     conn = get_connection()

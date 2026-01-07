@@ -400,6 +400,9 @@ async def katil(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         # 2️⃣ Okey belirle
         okey = okey_belirle(gosterge)
+        for tas in deste:
+           if tas["renk"] == okey["renk"] and tas["sayi"] == okey["sayi"]:
+            tas["isOkey"] = True
 
         # 3️⃣ GERÇEK DESTEYİ OLUŞTUR (106 taş)
         deste = deste_olustur(okey)
