@@ -183,56 +183,49 @@ function renkFormatla(renk) {
     if (r.includes('siyah')) return 'siyah';
     return 'siyah';
 }
+function tasOkeyMi(tas) {
+    if (!tas || !okeyTas) return false;
+    return tas.renk === okeyTas.renk && tas.sayi === okeyTas.sayi;
+}
 
 function perGecerliMi(grup) {
     if (grup.length < 3) return false;
 
-    // 🔹 Gerçek okeyleri ayır
-    const gercekOkeyler = grup.filter(
-        t => !t.sahte && okeyTas &&
-             t.renk === okeyTas.renk &&
-             t.sayi === okeyTas.sayi
-    ).length;
+    // Sahte okeyleri sayımdan çıkar
+    const gercekTaslar = grup.filter(t => t && !t.sahte);
 
-    // 🔹 Okey olmayan taşlar
-    const normalTaslar = grup.filter(
-        t => !(okeyTas && !t.sahte &&
-               t.renk === okeyTas.renk &&
-               t.sayi === okeyTas.sayi)
+    if (gercekTaslar.length === 0) return false;
+
+    // 🔹 SERİ PER
+    const ayniRenk = gercekTaslar.every(t => t.renk === gercekTaslar[0].renk);
+
+    let sayilar = gercekTaslar.map(t =>
+        tasOkeyMi(t) ? t.sayi : t.sayi
+    ).sort((a, b) => a - b);
+
+    let ardisik = true;
+    for (let i = 1; i < sayilar.length; i++) {
+        if (sayilar[i] !== sayilar[i - 1] + 1) {
+            ardisik = false;
+            break;
+        }
+    }
+
+    if (ayniRenk && ardisik) return true;
+
+    // 🔹 GRUP PER
+    const ayniSayi = gercekTaslar.every(t =>
+        t.sayi === gercekTaslar[0].sayi || tasOkeyMi(t)
     );
 
-    // 🔸 SERİ PER
-    if (normalTaslar.length >= 1) {
-        const renk = normalTaslar[0].renk;
-        const sayilar = normalTaslar.map(t => t.sayi).sort((a,b)=>a-b);
+    const farkliRenk = new Set(
+        gercekTaslar.filter(t => !tasOkeyMi(t)).map(t => t.renk)
+    ).size === gercekTaslar.filter(t => !tasOkeyMi(t)).length;
 
-        let eksik = 0;
-        for (let i = 1; i < sayilar.length; i++) {
-            eksik += (sayilar[i] - sayilar[i - 1] - 1);
-        }
-
-        if (
-            normalTaslar.every(t => t.renk === renk) &&
-            eksik <= gercekOkeyler
-        ) {
-            return true;
-        }
-    }
-
-    // 🔸 GRUP PER
-    const sayi = normalTaslar[0]?.sayi;
-    const renkler = new Set(normalTaslar.map(t => t.renk));
-
-    if (
-        normalTaslar.every(t => t.sayi === sayi) &&
-        (renkler.size + gercekOkeyler) >= 3
-    ) {
-        return true;
-    }
+    if (ayniSayi && farkliRenk) return true;
 
     return false;
 }
-
 
 
 
@@ -387,38 +380,37 @@ function arayuzuGuncelle() {
     mevcutEl.forEach((tas, idx) => {
         const d = document.createElement('div');
 
-        let ekstra = "";
+        let classList = ['tas'];
 
-        // ✅ SADECE GERÇEK OKEY PARLAR
-        if (
-            tas &&
-            okeyTas &&
-            !tas.sahte &&
-            tas.renk === okeyTas.renk &&
-            tas.sayi === okeyTas.sayi
-        ) {
-            ekstra = "okey-tas";
-        }
-
-        d.className = `tas ${tas ? renkFormatla(tas.renk) : 'bos'} ${ekstra}`;
-
-        // ✅ SAHTE OKEY = A HARFİ
-        if (tas?.sahte) {
-            d.innerText = "A";
+        if (!tas) {
+            classList.push('bos');
         } else {
-            d.innerText = tas ? tas.sayi : "";
+            classList.push(renkFormatla(tas.renk));
+
+            // 🔥 GERÇEK OKEY VURGUSU
+            if (tasOkeyMi(tas)) {
+                classList.push('okey-tas');
+            }
+
+            // ⭐ SAHTE OKEY (A)
+            if (tas.sahte === true) {
+                d.innerText = 'A';
+            } else {
+                d.innerText = tas.sayi;
+            }
         }
+
+        if (seciliIdx === idx) classList.push('secili');
+
+        d.className = classList.join(' ');
 
         d.onclick = async () => {
-
-            // 1️⃣ İlk tıklama → seç
             if (seciliIdx === null && tas) {
                 seciliIdx = idx;
                 arayuzuGuncelle();
                 return;
             }
 
-            // 2️⃣ Aynı taşa tekrar tık → AT
             if (seciliIdx === idx && tas) {
                 const onay = confirm("Bu taşı atmak istiyor musun?");
                 if (!onay) return;
@@ -434,7 +426,6 @@ function arayuzuGuncelle() {
                 });
 
                 const data = await res.json();
-
                 if (data.success) {
                     mevcutEl[idx] = null;
                     seciliIdx = null;
@@ -445,7 +436,6 @@ function arayuzuGuncelle() {
                 return;
             }
 
-            // 3️⃣ Yer değiştir
             if (seciliIdx !== null) {
                 [mevcutEl[idx], mevcutEl[seciliIdx]] =
                     [mevcutEl[seciliIdx], mevcutEl[idx]];
