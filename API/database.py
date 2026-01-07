@@ -88,6 +88,7 @@ def deste_olustur():
     return deste
 
 
+
 def oyuncu_eli_getir(chat_id, user_id):
     conn = get_connection()
     cur = conn.cursor()
