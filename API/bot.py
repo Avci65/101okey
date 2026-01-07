@@ -6,7 +6,7 @@ from flask import Flask, render_template, jsonify, request
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, WebAppInfo
 from telegram.ext import ApplicationBuilder, CommandHandler, ContextTypes, CallbackQueryHandler
 from database import get_connection
-
+from database import deste_olustur
 # Veritabanı fonksiyonları
 from database import (
     oyunu_baslat_db, sira_kimde, sirayi_degistir, 
@@ -119,38 +119,6 @@ def per_analiz_et_mantigi(taslar):
         
     return sonuc_istaka[:30], toplam_puan
 
-def deste_olustur():
-    """
-    106 taş üretir:
-    - 4 renk × 13 sayı × 2 = 104
-    - 2 adet sahte okey (okey taşının aynısı, is_fake_okey=True)
-    """
-
-    renkler = ["kirmizi", "mavi", "siyah", "sari"]
-    deste = []
-
-    # Normal taşlar
-    for renk in renkler:
-        for sayi in range(1, 14):
-            for _ in range(2):
-                deste.append({
-                    "renk": renk,
-                    "sayi": sayi,
-                    "is_okey": False,
-                    "is_fake_okey": False
-                })
-
-    # 2 adet SAHTE OKEY (okey taşının aynısı)
-    for _ in range(2):
-        deste.append({
-            "renk": okey_tas["renk"],
-            "sayi": okey_tas["sayi"],
-            "is_okey": False,
-            "is_fake_okey": True
-        })
-
-    random.shuffle(deste)
-    return deste
 
 
 def okey_belirle(gosterge):
@@ -394,14 +362,18 @@ async def katil(update: Update, context: ContextTypes.DEFAULT_TYPE):
         gosterge = deste.pop()
 
         # 3️⃣ OKEYİ BELİRLE
-        okey = okey_belirle(gosterge)
+        okey_tas = {
+            "renk": gosterge["renk"],
+            "sayi": gosterge["sayi"] + 1 if gosterge["sayi"] < 13 else 1
+        }
 
-        # 4️⃣ GERÇEK OKEYLERİ İŞARETLE
+        # 4️⃣ SAHTE OKEYLERE KİMLİK VER
         for tas in deste:
-            if tas["renk"] == okey["renk"] and tas["sayi"] == okey["sayi"]:
-                tas["isOkey"] = True
+            if tas.get("is_fake_okey"):
+                tas["renk"] = okey_tas["renk"]
+                tas["sayi"] = okey_tas["sayi"]
 
-        # 5️⃣ EL DAĞIT
+        # 5️⃣ OYUNCU ELİ
         hand = [deste.pop() for _ in range(22)]
 
         oyuncular = [{
@@ -415,14 +387,10 @@ async def katil(update: Update, context: ContextTypes.DEFAULT_TYPE):
             oyuncular=oyuncular,
             deste=deste,
             gosterge=gosterge,
-            okey=okey
+            okey=okey_tas
         )
 
-        await update.message.reply_text(
-            f"✅ Oyun başlatıldı\n"
-            f"🎯 Gösterge: {gosterge['renk']} {gosterge['sayi']}\n"
-            f"🟡 Okey: {okey['renk']} {okey['sayi']}"
-        )
+        await update.message.reply_text("✅ Oyun başlatıldı!")
 
     except Exception as e:
         print("KATIL HATASI:", e)
