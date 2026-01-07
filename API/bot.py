@@ -383,50 +383,46 @@ def renk_normalize_et(tas):
 
 
 async def katil(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user = update.effective_user
+    chat_id = update.effective_chat.id
+
     try:
-        user = update.effective_user
-        chat_id = update.effective_chat.id
+        # 1️⃣ DESTEYİ OLUŞTUR
+        deste = deste_olustur()
 
-        # 1️⃣ Gösterge çek (geçici normal deste)
-        gecici_deste = []
-        renkler = ["kirmizi", "mavi", "siyah", "sari"]
-        for renk in renkler:
-            for sayi in range(1, 14):
-                for _ in range(2):
-                    gecici_deste.append({"renk": renk, "sayi": sayi})
+        # 2️⃣ GÖSTERGEYİ ÇEK
+        gosterge = deste.pop()
 
-        random.shuffle(gecici_deste)
-        gosterge = gecici_deste.pop()
-
-        # 2️⃣ Okey belirle
+        # 3️⃣ OKEYİ BELİRLE
         okey = okey_belirle(gosterge)
+
+        # 4️⃣ GERÇEK OKEY TAŞLARINI İŞARETLE
         for tas in deste:
-           if tas["renk"] == okey["renk"] and tas["sayi"] == okey["sayi"]:
-            tas["isOkey"] = True
+            if tas["renk"] == okey["renk"] and tas["sayi"] == okey["sayi"]:
+                tas["isOkey"] = True
 
-        # 3️⃣ GERÇEK DESTEYİ OLUŞTUR (106 taş)
-        deste = deste_olustur(okey)
+        # 5️⃣ ELİ DAĞIT (22 TAŞ)
+        hand = [deste.pop() for _ in range(22)]
 
-        # 4️⃣ Oyuncuya 21 taş ver
-        hand = [deste.pop() for _ in range(21)]
+        oyuncular = [{
+            "id": user.id,
+            "name": user.first_name,
+            "hand": hand
+        }]
 
-        # 5️⃣ DB’ye yaz
+        # 6️⃣ VERİTABANINA KAYDET
         oyunu_baslat_db(
             chat_id=chat_id,
-            oyuncular=[{
-                "id": user.id,
-                "name": user.first_name,
-                "hand": hand
-            }],
+            oyuncular=oyuncular,
             deste=deste,
             gosterge=gosterge,
             okey=okey
         )
 
         await update.message.reply_text(
-            f"🟡 Oyun başlatıldı!\n"
-            f"🎴 Gösterge: {gosterge['renk']} {gosterge['sayi']}\n"
-            f"⭐ Okey: {okey['renk']} {okey['sayi']}"
+            f"✅ {user.first_name}, oyun başlatıldı!\n"
+            f"🎯 Gösterge: {gosterge['renk']} {gosterge['sayi']}\n"
+            f"🟡 Okey: {okey['renk']} {okey['sayi']}"
         )
 
     except Exception as e:
