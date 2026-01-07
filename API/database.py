@@ -61,7 +61,7 @@ def oyunu_baslat_db(chat_id, oyuncular, deste, gosterge, okey):
     conn.commit()
     cur.close()
     conn.close()
-def deste_olustur():
+def deste_olustur(okey_tas):
     renkler = ["kirmizi", "mavi", "siyah", "sari"]
     deste = []
 
