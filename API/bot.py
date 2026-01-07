@@ -281,19 +281,7 @@ def auto_sort():
 @flask_app.route('/can_open', methods=['POST'])
 def can_open():
     data = request.json
-    chat_id = int(data['chat_id'])
-    user_id = int(data['user_id'])
-
-    # Daha önce açtıysa tekrar kontrol gerekmez
-    if oyuncu_daha_once_acti_mi(chat_id, user_id):
-        return jsonify({"can_open": True, "puan": 0})
-
-    el = oyuncu_eli_getir(chat_id, user_id)
-    if not el:
-        return jsonify({"can_open": False, "puan": 0})
-
-    taslar = [t for t in el if t is not None]
-    _, puan = per_analiz_et_mantigi(taslar)
+    puan = data.get("puan", 0)
 
     return jsonify({
         "can_open": puan >= 101,

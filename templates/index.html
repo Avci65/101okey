@@ -281,23 +281,25 @@ function perPuaniniHesapla() {
     document.getElementById("perPuani").innerText = toplam;
     document.getElementById("puanBox").style.display = "block";
 }
-
 async function acabilirMiKontrolEt() {
+    const puan = Number(document.getElementById("perPuani").innerText);
+
     const res = await fetch('/can_open', {
         method: 'POST',
-        headers: {'Content-Type': 'application/json'},
+        headers: {
+            'Content-Type': 'application/json'
+        },
         body: JSON.stringify({
             user_id: user.id,
-            chat_id: chat_id
+            chat_id: chat_id,
+            puan: puan
         })
     });
 
     const data = await res.json();
     const statusDiv = document.getElementById("openStatus");
 
-    statusDiv.style.display = "block";        // 🔥 ZORLA GÖSTER
-    statusDiv.style.zIndex = "1100";
-    statusDiv.style.color = "white";          // 🔥 HER ZEMİNDE OKUNUR
+    statusDiv.style.display = "block";
 
     if (data.can_open) {
         statusDiv.innerText = "✅ El açabilirsin (101+)";
@@ -308,6 +310,7 @@ async function acabilirMiKontrolEt() {
     }
 }
 
+   
 
 /* ================= VERİ ÇEK ================= */
 async function taslariYukle() {
