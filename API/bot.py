@@ -119,38 +119,7 @@ def per_analiz_et_mantigi(taslar):
         
     return sonuc_istaka[:30], toplam_puan
 
-def deste_olustur(okey_tas):
-    """
-    106 taş üretir:
-    - 4 renk × 13 sayı × 2 = 104
-    - 2 adet sahte okey (okey taşının aynısı, is_fake_okey=True)
-    """
 
-    renkler = ["kirmizi", "mavi", "siyah", "sari"]
-    deste = []
-
-    # Normal taşlar
-    for renk in renkler:
-        for sayi in range(1, 14):
-            for _ in range(2):
-                deste.append({
-                    "renk": renk,
-                    "sayi": sayi,
-                    "is_okey": False,
-                    "is_fake_okey": False
-                })
-
-    # 2 adet SAHTE OKEY (okey taşının aynısı)
-    for _ in range(2):
-        deste.append({
-            "renk": okey_tas["renk"],
-            "sayi": okey_tas["sayi"],
-            "is_okey": False,
-            "is_fake_okey": True
-        })
-
-    random.shuffle(deste)
-    return deste
 
 
 def okey_belirle(gosterge):
