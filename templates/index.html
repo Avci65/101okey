@@ -191,39 +191,49 @@ function tasOkeyMi(tas) {
 function perGecerliMi(grup) {
     if (grup.length < 3) return false;
 
-    // Sahte okeyi NORMAL okey gibi say
-    const jokerler = grup.filter(t => t.isOkey);
-    const normalTaslar = grup.filter(t => !t.isOkey);
+    // OKEY ve SAHTE OKEY'leri ayır
+    const okeyler = grup.filter(t => t.is_okey || t.is_fake_okey);
+    const normalTaslar = grup.filter(t => !t.is_okey && !t.is_fake_okey);
 
-    if (normalTaslar.length === 0) return false;
+    // 🔹 TÜMÜ OKEY İSE → GEÇERLİ
+    if (normalTaslar.length === 0) return true;
 
-    /* ===== GRUP PER (aynı sayı) ===== */
-    const sayilar = new Set(normalTaslar.map(t => t.sayi));
-    const renkler = new Set(normalTaslar.map(t => t.renk));
+    /* =======================
+       GRUP PER (aynı sayı)
+    ======================= */
+    const sayi = normalTaslar[0].sayi;
+    const grupAyniSayi = normalTaslar.every(t => t.sayi === sayi);
 
-    if (
-        sayilar.size === 1 &&
-        renkler.size + jokerler.length === grup.length
-    ) {
-        return true;
+    if (grupAyniSayi) {
+        // renkler + okeyler toplamı >= 3 ise geçerli
+        const renkler = new Set(normalTaslar.map(t => t.renk));
+        if (renkler.size + okeyler.length >= 3) return true;
     }
 
-    /* ===== SERİ PER ===== */
+    /* =======================
+       SERİ PER (ardışık)
+    ======================= */
     const renk = normalTaslar[0].renk;
     if (!normalTaslar.every(t => t.renk === renk)) return false;
 
-    const sirali = normalTaslar
-        .map(t => t.sayi)
-        .sort((a, b) => a - b);
+    const sayilar = normalTaslar.map(t => t.sayi).sort((a, b) => a - b);
+    let jokerSayisi = okeyler.length;
 
-    let eksik = 0;
-    for (let i = 1; i < sirali.length; i++) {
-        const fark = sirali[i] - sirali[i - 1];
-        if (fark > 1) eksik += fark - 1;
+    for (let i = 1; i < sayilar.length; i++) {
+        const fark = sayilar[i] - sayilar[i - 1];
+        if (fark === 1) continue;
+
+        const gerekenJoker = fark - 1;
+        if (jokerSayisi >= gerekenJoker) {
+            jokerSayisi -= gerekenJoker;
+        } else {
+            return false;
+        }
     }
 
-    return eksik <= jokerler.length;
+    return true;
 }
+
 
 
 function perPuanHesaplaTekGrup(grup) {
