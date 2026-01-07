@@ -191,24 +191,24 @@ function tasOkeyMi(tas) {
 function perGecerliMi(grup) {
     if (grup.length < 3) return false;
 
-    const normalTaslar = grup.filter(t => !t.isOkey && !t.isFakeOkey);
-    const okeySayisi = grup.filter(t => t.isOkey).length;
-    const fakeOkeySayisi = grup.filter(t => t.isFakeOkey).length;
+    // Sahte okeyi NORMAL okey gibi say
+    const jokerler = grup.filter(t => t.isOkey);
+    const normalTaslar = grup.filter(t => !t.isOkey);
 
     if (normalTaslar.length === 0) return false;
 
-    /* ================= GRUP PER ================= */
+    /* ===== GRUP PER (aynı sayı) ===== */
     const sayilar = new Set(normalTaslar.map(t => t.sayi));
     const renkler = new Set(normalTaslar.map(t => t.renk));
 
     if (
         sayilar.size === 1 &&
-        (renkler.size + okeySayisi + fakeOkeySayisi) === grup.length
+        renkler.size + jokerler.length === grup.length
     ) {
         return true;
     }
 
-    /* ================= SERİ PER ================= */
+    /* ===== SERİ PER ===== */
     const renk = normalTaslar[0].renk;
     if (!normalTaslar.every(t => t.renk === renk)) return false;
 
@@ -219,38 +219,34 @@ function perGecerliMi(grup) {
     let eksik = 0;
     for (let i = 1; i < sirali.length; i++) {
         const fark = sirali[i] - sirali[i - 1];
-        if (fark > 1) {
-            eksik += fark - 1;
-        }
+        if (fark > 1) eksik += fark - 1;
     }
 
-    return eksik <= (okeySayisi + fakeOkeySayisi);
+    return eksik <= jokerler.length;
 }
 
+
 function perPuanHesaplaTekGrup(grup) {
-    if (grup.length < 3) return 0;
     if (!perGecerliMi(grup)) return 0;
 
-    let puan = 0;
+    const jokerler = grup.filter(t => t.isOkey);
+    const normalTaslar = grup.filter(t => !t.isOkey);
 
-    const normalTaslar = grup.filter(t => !t.isOkey && !t.isFakeOkey);
-    const okeySayisi = grup.filter(t => t.isOkey).length;
-
-    // GRUP PER (aynı sayı)
+    /* === GRUP PER === */
     const sayilar = new Set(normalTaslar.map(t => t.sayi));
     if (sayilar.size === 1) {
         const sayi = normalTaslar[0].sayi;
-        puan = (normalTaslar.length + okeySayisi) * sayi;
-        return puan;
+        return (normalTaslar.length + jokerler.length) * sayi;
     }
 
-    // SERİ PER
+    /* === SERİ PER === */
     const sirali = normalTaslar
         .map(t => t.sayi)
         .sort((a, b) => a - b);
 
     let beklenen = sirali[0];
-    let toplamTas = sirali.length + okeySayisi;
+    let toplamTas = normalTaslar.length + jokerler.length;
+    let puan = 0;
 
     for (let i = 0; i < toplamTas; i++) {
         puan += beklenen;
@@ -259,7 +255,6 @@ function perPuanHesaplaTekGrup(grup) {
 
     return puan;
 }
-
 
 
 /* ================= PUAN HESABI ================= */
@@ -384,44 +379,35 @@ function arayuzuGuncelle() {
     mevcutEl.forEach((tas, idx) => {
         const d = document.createElement("div");
 
-        let ekstraClass = "";
-        let yazilanDeger = "";
+        let yazi = "";
+        let extra = "";
 
         if (tas) {
-            // SAHTE OKEY (A harfi)
             if (tas.isFakeOkey) {
-                yazilanDeger = "A";
-                ekstraClass = "fake-okey";
-            }
-            // GERÇEK OKEY
-            else if (tas.isOkey) {
-                yazilanDeger = tas.sayi;
-                ekstraClass = "okey-tas";
-            }
-            // NORMAL TAŞ
-            else {
-                yazilanDeger = tas.sayi;
+                yazi = "A";          // 👈 SAHTE OKEY
+                extra = "fake-okey";
+            } else {
+                yazi = tas.sayi;
+                if (tas.isOkey) extra = "okey-tas"; // 👈 GERÇEK OKEY
             }
         }
 
         d.className = `
-            tas 
-            ${tas ? renkFormatla(tas.renk) : "bos"} 
+            tas
+            ${tas ? renkFormatla(tas.renk) : "bos"}
             ${seciliIdx === idx ? "secili" : ""}
-            ${ekstraClass}
+            ${extra}
         `;
 
-        d.innerText = yazilanDeger;
+        d.innerText = yazi;
 
         d.onclick = async () => {
-            // 1️⃣ Seçim yok → seç
             if (seciliIdx === null && tas) {
                 seciliIdx = idx;
                 arayuzuGuncelle();
                 return;
             }
 
-            // 2️⃣ Aynı taşa tekrar tık → at
             if (seciliIdx === idx && tas) {
                 const onay = confirm("Bu taşı atmak istiyor musun?");
                 if (!onay) return;
@@ -447,7 +433,6 @@ function arayuzuGuncelle() {
                 return;
             }
 
-            // 3️⃣ Başka taşa tık → yer değiştir
             if (seciliIdx !== null) {
                 [mevcutEl[idx], mevcutEl[seciliIdx]] =
                     [mevcutEl[seciliIdx], mevcutEl[idx]];
