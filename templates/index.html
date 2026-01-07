@@ -191,41 +191,34 @@ function tasOkeyMi(tas) {
 function perGecerliMi(grup) {
     if (grup.length < 3) return false;
 
-    // Sahte okeyleri sayımdan çıkar
-    const gercekTaslar = grup.filter(t => t && !t.sahte);
+    const normalTaslar = grup.filter(t => !t.isOkey && !t.isFakeOkey);
+    const okeySayisi = grup.filter(t => t.isOkey).length;
+    const sahteOkeyVar = grup.some(t => t.isFakeOkey);
 
-    if (gercekTaslar.length === 0) return false;
+    // Sahte okey joker değildir
+    if (sahteOkeyVar && okeySayisi > 0) return false;
 
-    // 🔹 SERİ PER
-    const ayniRenk = gercekTaslar.every(t => t.renk === gercekTaslar[0].renk);
-
-    let sayilar = gercekTaslar.map(t =>
-        tasOkeyMi(t) ? t.sayi : t.sayi
-    ).sort((a, b) => a - b);
-
-    let ardisik = true;
-    for (let i = 1; i < sayilar.length; i++) {
-        if (sayilar[i] !== sayilar[i - 1] + 1) {
-            ardisik = false;
-            break;
-        }
+    // 🔹 GRUP PER (aynı sayı, farklı renk)
+    const sayilar = new Set(normalTaslar.map(t => t.sayi));
+    if (sayilar.size === 1) {
+        return normalTaslar.length + okeySayisi >= 3;
     }
 
-    if (ayniRenk && ardisik) return true;
+    // 🔹 SERİ PER (aynı renk, ardışık)
+    const renkler = new Set(normalTaslar.map(t => t.renk));
+    if (renkler.size > 1) return false;
 
-    // 🔹 GRUP PER
-    const ayniSayi = gercekTaslar.every(t =>
-        t.sayi === gercekTaslar[0].sayi || tasOkeyMi(t)
-    );
+    const sayiList = normalTaslar.map(t => t.sayi).sort((a, b) => a - b);
 
-    const farkliRenk = new Set(
-        gercekTaslar.filter(t => !tasOkeyMi(t)).map(t => t.renk)
-    ).size === gercekTaslar.filter(t => !tasOkeyMi(t)).length;
+    let eksik = 0;
+    for (let i = 1; i < sayiList.length; i++) {
+        const fark = sayiList[i] - sayiList[i - 1];
+        if (fark > 1) eksik += fark - 1;
+    }
 
-    if (ayniSayi && farkliRenk) return true;
-
-    return false;
+    return eksik <= okeySayisi;
 }
+
 
 
 
@@ -383,29 +376,29 @@ function arayuzuGuncelle() {
     mevcutEl.forEach((tas, idx) => {
         const d = document.createElement('div');
 
-        let classList = ['tas'];
+        let classes = "tas";
+        let text = "";
 
         if (!tas) {
-            classList.push('bos');
+            classes += " bos";
         } else {
-            classList.push(renkFormatla(tas.renk));
+            classes += " " + renkFormatla(tas.renk);
 
-            // 🔥 GERÇEK OKEY VURGUSU
-            if (tasOkeyMi(tas)) {
-                classList.push('okey-tas');
-            }
-
-            // ⭐ SAHTE OKEY (A)
-            if (tas.sahte === true) {
-                d.innerText = 'A';
-            } else {
-                d.innerText = tas.sayi;
+            if (tas.isOkey) {
+                classes += " okey-tas";
+                text = tas.sayi; // okey gerçek sayı gibi görünür
+            } 
+            else if (tas.isFakeOkey) {
+                classes += " sahte-okey";
+                text = "A"; // AVCI'nin A'sı
+            } 
+            else {
+                text = tas.sayi;
             }
         }
 
-        if (seciliIdx === idx) classList.push('secili');
-
-        d.className = classList.join(' ');
+        d.className = classes;
+        d.innerText = text;
 
         d.onclick = async () => {
             if (seciliIdx === null && tas) {
@@ -414,38 +407,11 @@ function arayuzuGuncelle() {
                 return;
             }
 
-            if (seciliIdx === idx && tas) {
-                const onay = confirm("Bu taşı atmak istiyor musun?");
-                if (!onay) return;
-
-                const res = await fetch('/discard_tile', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        user_id: user.id,
-                        chat_id: chat_id,
-                        index: idx
-                    })
-                });
-
-                const data = await res.json();
-                if (data.success) {
-                    mevcutEl[idx] = null;
-                    seciliIdx = null;
-                    arayuzuGuncelle();
-                    perPuaniniHesapla();
-                    acabilirMiKontrolEt();
-                }
-                return;
-            }
-
             if (seciliIdx !== null) {
                 [mevcutEl[idx], mevcutEl[seciliIdx]] =
                     [mevcutEl[seciliIdx], mevcutEl[idx]];
-
                 seciliIdx = null;
                 await eliKaydet();
-
                 arayuzuGuncelle();
                 perPuaniniHesapla();
                 acabilirMiKontrolEt();
