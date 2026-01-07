@@ -396,12 +396,12 @@ async def katil(update: Update, context: ContextTypes.DEFAULT_TYPE):
         # 3️⃣ OKEYİ BELİRLE
         okey = okey_belirle(gosterge)
 
-        # 4️⃣ GERÇEK OKEY TAŞLARINI İŞARETLE
+        # 4️⃣ GERÇEK OKEYLERİ İŞARETLE
         for tas in deste:
             if tas["renk"] == okey["renk"] and tas["sayi"] == okey["sayi"]:
                 tas["isOkey"] = True
 
-        # 5️⃣ ELİ DAĞIT (22 TAŞ)
+        # 5️⃣ EL DAĞIT
         hand = [deste.pop() for _ in range(22)]
 
         oyuncular = [{
@@ -410,7 +410,6 @@ async def katil(update: Update, context: ContextTypes.DEFAULT_TYPE):
             "hand": hand
         }]
 
-        # 6️⃣ VERİTABANINA KAYDET
         oyunu_baslat_db(
             chat_id=chat_id,
             oyuncular=oyuncular,
@@ -420,7 +419,7 @@ async def katil(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
 
         await update.message.reply_text(
-            f"✅ {user.first_name}, oyun başlatıldı!\n"
+            f"✅ Oyun başlatıldı\n"
             f"🎯 Gösterge: {gosterge['renk']} {gosterge['sayi']}\n"
             f"🟡 Okey: {okey['renk']} {okey['sayi']}"
         )
@@ -428,6 +427,7 @@ async def katil(update: Update, context: ContextTypes.DEFAULT_TYPE):
     except Exception as e:
         print("KATIL HATASI:", e)
         await update.message.reply_text("❌ Oyun başlatılırken hata oluştu.")
+
 
 
 if __name__ == '__main__':

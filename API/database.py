@@ -65,7 +65,6 @@ def deste_olustur():
     renkler = ["kirmizi", "mavi", "siyah", "sari"]
     deste = []
 
-    # 4 renk × 13 sayı × 2 = 104 taş
     for renk in renkler:
         for sayi in range(1, 14):
             for _ in range(2):
@@ -76,7 +75,7 @@ def deste_olustur():
                     "isFakeOkey": False
                 })
 
-    # 2 adet SAHTE OKEY
+    # 2 adet sahte okey
     for _ in range(2):
         deste.append({
             "renk": "sahte",
