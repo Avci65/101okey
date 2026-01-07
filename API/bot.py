@@ -218,10 +218,13 @@ def index():
 
 
 
-@flask_app.route('/get_hand')
+@flask_app.route("/get_hand", methods=["GET"])
 def get_hand():
-    user_id = request.args.get("user_id")
-    chat_id = request.args.get("chat_id")
+    user_id = request.args.get("user_id", type=int)
+    chat_id = request.args.get("chat_id", type=int)
+
+    if not user_id or not chat_id:
+        return jsonify({"error": "Eksik parametre"}), 400
 
     conn = get_connection()
     cur = conn.cursor()
@@ -237,15 +240,60 @@ def get_hand():
     conn.close()
 
     if not row:
-        return jsonify({})
+        return jsonify({"error": "Oyun bulunamadı"}), 404
 
     players, gosterge, okey = row
 
+    # Oyuncunun eli
+    el = players.get(str(user_id), [])
+
+    # 🟡 GÖSTERGE
+    gosterge_tas = {
+        "renk": gosterge["renk"],
+        "sayi": gosterge["sayi"]
+    } if gosterge else None
+
+    # ⭐ GERÇEK OKEY
+    okey_tas = {
+        "renk": okey["renk"],
+        "sayi": okey["sayi"],
+        "isOkey": True
+    } if okey else None
+
+    # 🎭 EL İÇİNDE OKEY & SAHTE OKEY İŞARETLEME
+    yeni_el = []
+    for tas in el:
+        if not tas:
+            yeni_el.append(None)
+            continue
+
+        # GERÇEK OKEY
+        if (
+            okey
+            and tas["renk"] == okey["renk"]
+            and tas["sayi"] == okey["sayi"]
+            and not tas.get("isFakeOkey", False)
+        ):
+            tas["isOkey"] = True
+            tas["isFakeOkey"] = False
+
+        # SAHTE OKEY
+        elif tas.get("isFakeOkey", False):
+            tas["isOkey"] = False
+            tas["isFakeOkey"] = True
+
+        else:
+            tas["isOkey"] = False
+            tas["isFakeOkey"] = False
+
+        yeni_el.append(tas)
+
     return jsonify({
-        "el": players.get(str(user_id), []),
-        "gosterge": gosterge,
-        "okey": okey
+        "el": yeni_el,
+        "gosterge": gosterge_tas,
+        "okey": okey_tas
     })
+
 
 
 @flask_app.route('/save_hand', methods=['POST'])

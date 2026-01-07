@@ -193,32 +193,39 @@ function perGecerliMi(grup) {
 
     const normalTaslar = grup.filter(t => !t.isOkey && !t.isFakeOkey);
     const okeySayisi = grup.filter(t => t.isOkey).length;
-    const sahteOkeyVar = grup.some(t => t.isFakeOkey);
+    const fakeOkeySayisi = grup.filter(t => t.isFakeOkey).length;
 
-    // Sahte okey joker değildir
-    if (sahteOkeyVar && okeySayisi > 0) return false;
+    if (normalTaslar.length === 0) return false;
 
-    // 🔹 GRUP PER (aynı sayı, farklı renk)
+    /* ================= GRUP PER ================= */
     const sayilar = new Set(normalTaslar.map(t => t.sayi));
-    if (sayilar.size === 1) {
-        return normalTaslar.length + okeySayisi >= 3;
+    const renkler = new Set(normalTaslar.map(t => t.renk));
+
+    if (
+        sayilar.size === 1 &&
+        (renkler.size + okeySayisi + fakeOkeySayisi) === grup.length
+    ) {
+        return true;
     }
 
-    // 🔹 SERİ PER (aynı renk, ardışık)
-    const renkler = new Set(normalTaslar.map(t => t.renk));
-    if (renkler.size > 1) return false;
+    /* ================= SERİ PER ================= */
+    const renk = normalTaslar[0].renk;
+    if (!normalTaslar.every(t => t.renk === renk)) return false;
 
-    const sayiList = normalTaslar.map(t => t.sayi).sort((a, b) => a - b);
+    const sirali = normalTaslar
+        .map(t => t.sayi)
+        .sort((a, b) => a - b);
 
     let eksik = 0;
-    for (let i = 1; i < sayiList.length; i++) {
-        const fark = sayiList[i] - sayiList[i - 1];
-        if (fark > 1) eksik += fark - 1;
+    for (let i = 1; i < sirali.length; i++) {
+        const fark = sirali[i] - sirali[i - 1];
+        if (fark > 1) {
+            eksik += fark - 1;
+        }
     }
 
-    return eksik <= okeySayisi;
+    return eksik <= (okeySayisi + fakeOkeySayisi);
 }
-
 
 function perPuanHesaplaTekGrup(grup) {
     if (grup.length < 3) return 0;
@@ -371,46 +378,80 @@ async function eliKaydet() {
 
 /* ================= UI ================= */
 function arayuzuGuncelle() {
-    const istaka = document.getElementById('istaka');
-    istaka.innerHTML = '';
+    const istaka = document.getElementById("istaka");
+    istaka.innerHTML = "";
 
     mevcutEl.forEach((tas, idx) => {
-        const d = document.createElement('div');
+        const d = document.createElement("div");
 
-        let classes = "tas";
-        let text = "";
+        let ekstraClass = "";
+        let yazilanDeger = "";
 
-        if (!tas) {
-            classes += " bos";
-        } else {
-            classes += " " + renkFormatla(tas.renk);
-
-            if (tas.isOkey) {
-                classes += " okey-tas";
-                text = tas.sayi; // okey gerçek sayı gibi görünür
-            } 
-            else if (tas.isFakeOkey) {
-                classes += " sahte-okey";
-                text = "A"; // AVCI'nin A'sı
-            } 
+        if (tas) {
+            // SAHTE OKEY (A harfi)
+            if (tas.isFakeOkey) {
+                yazilanDeger = "A";
+                ekstraClass = "fake-okey";
+            }
+            // GERÇEK OKEY
+            else if (tas.isOkey) {
+                yazilanDeger = tas.sayi;
+                ekstraClass = "okey-tas";
+            }
+            // NORMAL TAŞ
             else {
-                text = tas.sayi;
+                yazilanDeger = tas.sayi;
             }
         }
 
-        d.className = classes;
-        d.innerText = text;
+        d.className = `
+            tas 
+            ${tas ? renkFormatla(tas.renk) : "bos"} 
+            ${seciliIdx === idx ? "secili" : ""}
+            ${ekstraClass}
+        `;
+
+        d.innerText = yazilanDeger;
 
         d.onclick = async () => {
+            // 1️⃣ Seçim yok → seç
             if (seciliIdx === null && tas) {
                 seciliIdx = idx;
                 arayuzuGuncelle();
                 return;
             }
 
+            // 2️⃣ Aynı taşa tekrar tık → at
+            if (seciliIdx === idx && tas) {
+                const onay = confirm("Bu taşı atmak istiyor musun?");
+                if (!onay) return;
+
+                const res = await fetch("/discard_tile", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                        user_id: user.id,
+                        chat_id: chat_id,
+                        index: idx
+                    })
+                });
+
+                const data = await res.json();
+                if (data.success) {
+                    mevcutEl[idx] = null;
+                    seciliIdx = null;
+                    arayuzuGuncelle();
+                    perPuaniniHesapla();
+                    acabilirMiKontrolEt();
+                }
+                return;
+            }
+
+            // 3️⃣ Başka taşa tık → yer değiştir
             if (seciliIdx !== null) {
                 [mevcutEl[idx], mevcutEl[seciliIdx]] =
                     [mevcutEl[seciliIdx], mevcutEl[idx]];
+
                 seciliIdx = null;
                 await eliKaydet();
                 arayuzuGuncelle();
@@ -422,6 +463,7 @@ function arayuzuGuncelle() {
         istaka.appendChild(d);
     });
 }
+
 
 /* ================= BAŞLAT ================= */
 window.onload = async () => {
