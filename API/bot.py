@@ -30,95 +30,129 @@ flask_app = Flask(__name__, template_folder=template_path)
 
 
 def per_gecerli_mi(grup):
-    """Bir taş grubunun 101 kurallarına göre per olup olmadığını denetler."""
-    if any(t["renk"] == "sahte" for t in grup):
-     return True
+    """Bir grubun okey/sahte okey dahil per olup olmadığını denetler."""
     if len(grup) < 3: 
         return False
     
-    # 1. Seri Per Kontrolü (Aynı renk, ardışık sayılar: örn. Mavi 1-2-3)
-    is_seri = all(t['renk'] == grup[0]['renk'] for t in grup) and \
-              all(grup[i]['sayi'] == grup[i-1]['sayi'] + 1 for i in range(1, len(grup)))
-    
-    if is_seri:
+    # Okeyleri ve normal taşları ayır
+    okeyler = [t for t in grup if t.get("isOkey") or t.get("isFakeOkey")]
+    normal_taslar = [t for t in grup if not (t.get("isOkey") or t.get("isFakeOkey"))]
+
+    # Hepsi okeyse (nadir ama mümkün) geçerlidir
+    if not normal_taslar:
         return True
 
-    # 2. Grup Per Kontrolü (Aynı sayı, farklı renkler: örn. Siyah 5 - Mavi 5 - Kırmızı 5)
-    renkler = [t['renk'] for t in grup]
-    is_grup = all(t['sayi'] == grup[0]['sayi'] for t in grup) and \
-              len(set(renkler)) == len(renkler)
-              
-    return is_grup
+    # --- GRUP PER KONTROLÜ (Aynı sayı, farklı renkler) ---
+    sayi = normal_taslar[0]['sayi']
+    if all(t['sayi'] == sayi for t in normal_taslar):
+        renkler = {t['renk'] for t in normal_taslar}
+        # Farklı renk sayısı + okey sayısı >= 3 olmalı
+        return (len(renkler) + len(okeyler)) >= 3 and len(renkler) == len(normal_taslar)
+
+    # --- SERİ PER KONTROLÜ (Aynı renk, ardışık sayılar) ---
+    renk = normal_taslar[0]['renk']
+    if all(t['renk'] == renk for t in normal_taslar):
+        sayilar = sorted([t['sayi'] for t in normal_taslar])
+        # Sayılar arasındaki boşlukları okeyler doldurabiliyor mu?
+        bosluk_sayisi = 0
+        for i in range(len(sayilar) - 1):
+            fark = sayilar[i+1] - sayilar[i]
+            if fark == 0: return False # Aynı sayıdan iki tane seri perde olmaz
+            bosluk_sayisi += (fark - 1)
+        
+        return bosluk_sayisi <= len(okeyler)
+
+    return False
 
 def per_analiz_et_mantigi(taslar):
-    """Taşları en yüksek puanı alacak şekilde dizer ve puanı hesaplar."""
-    renkler = {}
-    sayilar = {}
+    """Taşları okeyi kullanarak en yüksek puanı alacak şekilde dizer."""
+    jokerler = [t for t in taslar if t.get("isOkey") or t.get("isFakeOkey")]
+    normal_taslar = [t for t in taslar if not (t.get("isOkey") or t.get("isFakeOkey"))]
     
-    # Taşları renklerine ve sayılarına göre gruplandır
-    for t in taslar:
-        r, s = t['renk'], t['sayi']
-        if r not in renkler: renkler[r] = []
-        renkler[r].append(t)
-        if s not in sayilar: sayilar[s] = []
-        sayilar[s].append(t)
+    kullanilan_id = set() # Hangi taşlar perlere dahil edildi?
+    final_perler = []
 
-    final_dizilim = []
-    kullanilan_tas_keyleri = set()
-
-    # ÖNCE SERİ PERLERİ BUL (Genelde daha çok puan getirir)
+    # --- A. SERİ PERLERİ BUL (Öncelikli) ---
+    renkler = ["kirmizi", "mavi", "siyah", "sari"]
     for r in renkler:
-        liste = sorted(renkler[r], key=lambda x: x['sayi'])
-        gecici_per = []
-        for i in range(len(liste)):
-            if not gecici_per or liste[i]['sayi'] == gecici_per[-1]['sayi'] + 1:
-                gecici_per.append(liste[i])
-            else:
-                if len(gecici_per) >= 3:
-                    final_dizilim.append(list(gecici_per))
-                    for p in gecici_per: kullanilan_tas_keyleri.add(f"{p['renk']}-{p['sayi']}")
-                gecici_per = [liste[i]]
-        if len(gecici_per) >= 3:
-            final_dizilim.append(list(gecici_per))
-            for p in gecici_per: kullanilan_tas_keyleri.add(f"{p['renk']}-{p['sayi']}")
+        renk_grubu = sorted([t for t in normal_taslar if t['renk'] == r], key=lambda x: x['sayi'])
+        i = 0
+        while i < len(renk_grubu):
+            gecici_per = [renk_grubu[i]]
+            j = i + 1
+            while j < len(renk_grubu):
+                # Ardışık mı yoksa arada jokerle dolacak boşluk mu var?
+                fark = renk_grubu[j]['sayi'] - gecici_per[-1]['sayi']
+                if fark == 1:
+                    gecici_per.append(renk_grubu[j])
+                    j += 1
+                elif 1 < fark <= (len(jokerler) + 1): # Boşluk jokerle dolabilir mi?
+                    # Bu basitleştirilmiş bir yaklaşımdır
+                    gecici_per.append(renk_grubu[j])
+                    j += 1
+                else:
+                    break
+            
+            if len(gecici_per) >= 2: # En az 2 taş varsa jokerle 3'e tamamlanabilir
+                if len(gecici_per) >= 3 or len(jokerler) > 0:
+                    # Per geçerli mi kontrol et
+                    # (Not: Burada jokerleri geçici olarak ekleyip test etmek gerekebilir)
+                    final_perler.append(gecici_per)
+                    for t in gecici_per: kullanilan_id.add(id(t))
+                    i = j
+                else: i += 1
+            else: i += 1
 
-    # SONRA GRUP PERLERİ BUL (Kullanılmayan taşlardan)
-    for s in sayilar:
-        liste = sayilar[s]
+    # --- B. GRUP PERLERİ BUL (Kalanlardan) ---
+    kalan_taslar = [t for t in normal_taslar if id(t) not in kullanilan_id]
+    for s in range(1, 14):
+        ayni_sayilar = [t for t in kalan_taslar if t['sayi'] == s]
+        # Renkleri benzersiz yap
         benzersiz_grup = []
         gorulen_renkler = set()
-        for t in liste:
-            key = f"{t['renk']}-{t['sayi']}"
-            if t['renk'] not in gorulen_renkler and key not in kullanilan_tas_keyleri:
+        for t in ayni_sayilar:
+            if t['renk'] not in gorulen_renkler:
                 benzersiz_grup.append(t)
                 gorulen_renkler.add(t['renk'])
         
-        if len(benzersiz_grup) >= 3:
-            final_dizilim.append(benzersiz_grup)
-            for p in benzersiz_grup: kullanilan_tas_keyleri.add(f"{p['renk']}-{p['sayi']}")
+        if len(benzersiz_grup) >= 3 or (len(benzersiz_grup) >= 2 and len(jokerler) > 0):
+            final_perler.append(benzersiz_grup)
+            for t in benzersiz_grup: kullanilan_id.add(id(t))
 
-    # ISTAKAYI OLUŞTUR VE PUANI HESAPLA
-    sonuc_istaka = []
+    # --- C. JOKERLERİ DAĞIT VE ISTAKAYI OLUŞTUR ---
+    istaka = []
+    kullanilan_joker_sayisi = 0
     toplam_puan = 0
-    
-    for per in final_dizilim:
-        # Sadece kurallara uyan perlerin puanını topla
+
+    for per in final_perler:
+        # Per 2 taşlıysa 1 joker ekle
+        if len(per) == 2 and kullanilan_joker_sayisi < len(jokerler):
+            per.append(jokerler[kullanilan_joker_sayisi])
+            kullanilan_joker_sayisi += 1
+        
+        # Puan hesapla
         if per_gecerli_mi(per):
-            toplam_puan += sum(t['sayi'] for t in per)
+            # Okeyli perlerde puan hesabı: Joker girdiği yerdeki taşın değerini alır
+            puan = sum(t['sayi'] for t in per if not (t.get("isOkey") or t.get("isFakeOkey")))
+            # Basit puan hesabı: Joker ortalama bir değer alır veya per mantığına göre eklenir
+            toplam_puan += puan 
         
-        sonuc_istaka.extend(per)
-        sonuc_istaka.append(None) # Her perden sonra boşluk bırak
+        istaka.extend(per)
+        istaka.append(None) # Perler arası boşluk
 
-    # PER OLMAYAN TAŞLARI SONA EKLE
-    kalanlar = [t for t in taslar if f"{t['renk']}-{t['sayi']}" not in kullanilan_tas_keyleri]
-    sonuc_istaka.extend(kalanlar)
+    # Kalan her şeyi sona ekle
+    kalanlar = [t for t in taslar if id(t) not in kullanilan_id and not (t.get("isOkey") or t.get("isFakeOkey"))]
+    # Kullanılmayan jokerleri de ekle
+    if kullanilan_joker_sayisi < len(jokerler):
+        kalanlar.extend(jokerler[kullanilan_joker_sayisi:])
+        
+    istaka.extend(kalanlar)
     
-    # 30 SLOTLUK ISTAKAYA TAMAMLA
-    while len(sonuc_istaka) < 30:
-        sonuc_istaka.append(None)
+    # 30'a tamamla
+    while len(istaka) < 30:
+        istaka.append(None)
         
-    return sonuc_istaka[:30], toplam_puan
-
+    return istaka[:30], toplam_puan
 
 
 def okey_belirle(gosterge):
