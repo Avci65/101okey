@@ -196,13 +196,7 @@ def get_hand():
 
     conn = get_connection()
     cur = conn.cursor()
-
-    cur.execute("""
-        SELECT players, gosterge, okey
-        FROM games
-        WHERE chat_id = %s
-    """, (chat_id,))
-
+    cur.execute("SELECT players, gosterge, okey FROM games WHERE chat_id = %s", (chat_id,))
     row = cur.fetchone()
     cur.close()
     conn.close()
@@ -211,55 +205,33 @@ def get_hand():
         return jsonify({"error": "Oyun bulunamadı"}), 404
 
     players, gosterge, okey = row
-
-    # Oyuncunun eli
     el = players.get(str(user_id), [])
 
-    # 🟡 GÖSTERGE
-    gosterge_tas = {
-        "renk": gosterge["renk"],
-        "sayi": gosterge["sayi"]
-    } if gosterge else None
-
-    # ⭐ GERÇEK OKEY
-    okey_tas = {
-        "renk": okey["renk"],
-        "sayi": okey["sayi"],
-        "isOkey": True
-    } if okey else None
-
-    # 🎭 EL İÇİNDE OKEY & SAHTE OKEY İŞARETLEME
     yeni_el = []
     for tas in el:
         if not tas:
             yeni_el.append(None)
             continue
 
-        # GERÇEK OKEY
-        if (
-            okey
-            and tas["renk"] == okey["renk"]
-            and tas["sayi"] == okey["sayi"]
-            and not tas.get("isFakeOkey", False)
-        ):
-            tas["isOkey"] = True
-            tas["isFakeOkey"] = False
+        # 1. OKEY KONTROLÜ: Rengi ve sayısı okey ile aynı olan normal taş
+        is_okey = (
+            okey and 
+            tas.get("renk") == okey.get("renk") and 
+            tas.get("sayi") == okey.get("sayi") and 
+            not tas.get("isFakeOkey")
+        )
 
-        # SAHTE OKEY
-        elif tas.get("isFakeOkey", False):
-            tas["isOkey"] = False
-            tas["isFakeOkey"] = True
+        # 2. SAHTE OKEY KONTROLÜ: Direkt veritabanındaki flag'e bakıyoruz
+        is_fake = tas.get("isFakeOkey", False)
 
-        else:
-            tas["isOkey"] = False
-            tas["isFakeOkey"] = False
-
+        tas["isOkey"] = is_okey
+        tas["isFakeOkey"] = is_fake
         yeni_el.append(tas)
 
     return jsonify({
         "el": yeni_el,
-        "gosterge": gosterge_tas,
-        "okey": okey_tas
+        "gosterge": gosterge,
+        "okey": okey
     })
 
 

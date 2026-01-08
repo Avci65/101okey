@@ -61,8 +61,10 @@
     border: 2px solid gold;
 }
 .okey-tas {
-    outline: 3px solid gold;
-    box-shadow: 0 0 12px gold;
+    outline: 4px solid gold !important;
+    box-shadow: 0 0 15px gold !important;
+    position: relative;
+    z-index: 10;
 }
         .bos { background: rgba(0,0,0,0.2); }
         .secili { outline: 3px solid gold; }
@@ -388,29 +390,29 @@ function arayuzuGuncelle() {
 
     mevcutEl.forEach((tas, idx) => {
         const d = document.createElement("div");
-
         let yazi = "";
-        let extra = "";
+        let extraClass = "";
 
         if (tas) {
             if (tas.isFakeOkey) {
-                yazi = "A";          // 👈 SAHTE OKEY
-                extra = "fake-okey";
+                // Sahte Okey ise "A" yazdır ve özel stilini ver
+                yazi = "A";
+                extraClass = "fake-okey";
             } else {
+                // Normal taş veya Gerçek Okey ise sayısını yazdır
                 yazi = tas.sayi;
-                if (tas.isOkey) extra = "okey-tas"; // 👈 GERÇEK OKEY
+                // Eğer API'den isOkey: true gelmişse altın çerçeve ekle
+                if (tas.isOkey === true) {
+                    extraClass = "okey-tas";
+                }
             }
         }
 
-        d.className = `
-            tas
-            ${tas ? renkFormatla(tas.renk) : "bos"}
-            ${seciliIdx === idx ? "secili" : ""}
-            ${extra}
-        `;
-
+        // CSS sınıflarını birleştir
+        d.className = `tas ${tas ? renkFormatla(tas.renk) : "bos"} ${seciliIdx === idx ? "secili" : ""} ${extraClass}`;
         d.innerText = yazi;
 
+        // Tıklama işlemleri (Taş taşıma veya Atma)
         d.onclick = async () => {
             if (seciliIdx === null && tas) {
                 seciliIdx = idx;
@@ -421,19 +423,12 @@ function arayuzuGuncelle() {
             if (seciliIdx === idx && tas) {
                 const onay = confirm("Bu taşı atmak istiyor musun?");
                 if (!onay) return;
-
                 const res = await fetch("/discard_tile", {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({
-                        user_id: user.id,
-                        chat_id: chat_id,
-                        index: idx
-                    })
+                    body: JSON.stringify({ user_id: user.id, chat_id: chat_id, index: idx })
                 });
-
-                const data = await res.json();
-                if (data.success) {
+                if ((await res.json()).success) {
                     mevcutEl[idx] = null;
                     seciliIdx = null;
                     arayuzuGuncelle();
@@ -444,9 +439,7 @@ function arayuzuGuncelle() {
             }
 
             if (seciliIdx !== null) {
-                [mevcutEl[idx], mevcutEl[seciliIdx]] =
-                    [mevcutEl[seciliIdx], mevcutEl[idx]];
-
+                [mevcutEl[idx], mevcutEl[seciliIdx]] = [mevcutEl[seciliIdx], mevcutEl[idx]];
                 seciliIdx = null;
                 await eliKaydet();
                 arayuzuGuncelle();
