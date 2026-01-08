@@ -190,31 +190,25 @@ function tasOkeyMi(tas) {
     return tas.renk === okeyTas.renk && tas.sayi === okeyTas.sayi;
 }
 
+/* ================= PER GEÇERLİ Mİ? ================= */
 function perGecerliMi(grup) {
     if (grup.length < 3) return false;
 
-    // OKEY ve SAHTE OKEY'leri ayır
-    const okeyler = grup.filter(t => t.is_okey || t.is_fake_okey);
-    const normalTaslar = grup.filter(t => !t.is_okey && !t.is_fake_okey);
+    // API'den gelen isOkey ve isFakeOkey anahtarlarını kullanıyoruz
+    const okeyler = grup.filter(t => t && (t.isOkey || t.isFakeOkey));
+    const normalTaslar = grup.filter(t => t && !t.isOkey && !t.isFakeOkey);
 
-    // 🔹 TÜMÜ OKEY İSE → GEÇERLİ
     if (normalTaslar.length === 0) return true;
 
-    /* =======================
-       GRUP PER (aynı sayı)
-    ======================= */
+    /* GRUP PER (Aynı sayı, farklı renk) */
     const sayi = normalTaslar[0].sayi;
     const grupAyniSayi = normalTaslar.every(t => t.sayi === sayi);
-
     if (grupAyniSayi) {
-        // renkler + okeyler toplamı >= 3 ise geçerli
         const renkler = new Set(normalTaslar.map(t => t.renk));
         if (renkler.size + okeyler.length >= 3) return true;
     }
 
-    /* =======================
-       SERİ PER (ardışık)
-    ======================= */
+    /* SERİ PER (Aynı renk, ardışık sayı) */
     const renk = normalTaslar[0].renk;
     if (!normalTaslar.every(t => t.renk === renk)) return false;
 
@@ -224,7 +218,7 @@ function perGecerliMi(grup) {
     for (let i = 1; i < sayilar.length; i++) {
         const fark = sayilar[i] - sayilar[i - 1];
         if (fark === 1) continue;
-
+        
         const gerekenJoker = fark - 1;
         if (jokerSayisi >= gerekenJoker) {
             jokerSayisi -= gerekenJoker;
@@ -232,8 +226,37 @@ function perGecerliMi(grup) {
             return false;
         }
     }
-
     return true;
+}
+
+/* ================= PUAN HESABI (Okey Dahil) ================= */
+function perPuanHesaplaTekGrup(grup) {
+    if (!perGecerliMi(grup)) return 0;
+
+    const normalTaslar = grup.filter(t => t && !t.isOkey && !t.isFakeOkey);
+    
+    // Eğer sadece okeylerden oluşuyorsa (nadiren), okeyin değerini bul
+    if (normalTaslar.length === 0) return 0; 
+
+    const sayilar = new Set(normalTaslar.map(t => t.sayi));
+    
+    // GRUP PER: (Taş Sayısı * Sayı Değeri)
+    if (sayilar.size === 1) {
+        return grup.length * normalTaslar[0].sayi;
+    }
+
+    // SERİ PER: Okeyler dahil tüm sayıların toplamı
+    // Basit mantık: (En küçük sayı + En büyük sayı) / 2 * toplam taş sayısı
+    const sirali = normalTaslar.map(t => t.sayi).sort((a, b) => a - b);
+    let baslangic = sirali[0];
+    let puan = 0;
+    
+    // Per içindeki her pozisyonun değerini hesapla
+    for(let i=0; i < grup.length; i++) {
+        puan += baslangic;
+        baslangic++;
+    }
+    return puan;
 }
 
 

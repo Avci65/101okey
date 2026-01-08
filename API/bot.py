@@ -375,7 +375,7 @@ async def katil(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         # 4️⃣ SAHTE OKEYLERE KİMLİK VER
         for tas in deste:
-            if tas.get("is_fake_okey"):
+            if tas.get("isFakeOkey"):
                 tas["renk"] = okey_tas["renk"]
                 tas["sayi"] = okey_tas["sayi"]
 
