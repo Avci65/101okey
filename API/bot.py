@@ -322,10 +322,27 @@ def get_hand():
 
 @flask_app.route('/save_hand', methods=['POST'])
 def save_hand():
-    data = request.json
-    temiz_el = [renk_normalize_et(tas) for tas in data.get('el', [])]
+    data = request.json or {}
+    el = data.get('el', [])
+
+    temiz_el = []
+    for tas in el:
+        # ✅ boş slotlar korunmalı
+        if tas is None:
+            temiz_el.append(None)
+            continue
+
+        if isinstance(tas, dict) and tas.get("bos") is True:
+            temiz_el.append({"bos": True})
+            continue
+
+        # ✅ normal taşları normalize et
+        t2 = renk_normalize_et(tas)
+        temiz_el.append(t2)
+
     oyuncu_eli_guncelle(int(data['chat_id']), int(data['user_id']), temiz_el)
     return jsonify({"success": True})
+
 
 @flask_app.route('/auto_sort', methods=['POST'])
 def auto_sort():
@@ -397,9 +414,10 @@ def renk_normalize_et(tas):
     Taşı ASLA sırf renk tanınmadı diye silmez.
     Sadece normalize etmeye çalışır.
     """
-    if not tas or not isinstance(tas, dict):
+    if not tas:
         return None
-
+    if isinstance(tas,dict) and tas.get("bos") is True:
+        return {"bos":True}
     if 'renk' not in tas or 'sayi' not in tas:
         return None
 
