@@ -39,14 +39,26 @@ def per_gecerli_mi(grup):
     if not grup or len(grup) < 3:
         return False
 
-    jokerler = [t for t in grup if t and t.get("isOkey")]
-    normal = [t for t in grup if t and not t.get("isOkey")]
+    # sadece sağlam dict taşlar
+    grup = [t for t in grup if isinstance(t, dict)]
+    if len(grup) < 3:
+        return False
+
+    jokerler = [t for t in grup if t.get("isOkey")]
+    normal = [t for t in grup if not t.get("isOkey")]
 
     joker_sayisi = len(jokerler)
     if len(normal) == 0:
         return False
 
-    # Grup per kontrolü (aynı sayı, farklı renk)
+    # 🔥 güvenlik: renk/sayi eksikse invalid
+    for t in normal:
+        if "renk" not in t or "sayi" not in t:
+            return False
+        if t["renk"] is None or t["sayi"] is None:
+            return False
+
+    # Grup per
     sayilar = {t["sayi"] for t in normal}
     if len(sayilar) == 1:
         renkler = [t["renk"] for t in normal]
@@ -54,7 +66,7 @@ def per_gecerli_mi(grup):
             return False
         return True
 
-    # Seri per kontrolü (aynı renk, ardışık - joker boşluk doldurabilir)
+    # Seri per
     renkler = {t["renk"] for t in normal}
     if len(renkler) != 1:
         return False
@@ -324,27 +336,38 @@ def save_hand():
 
 @flask_app.route('/auto_sort', methods=['POST'])
 def auto_sort():
-    data = request.json
+    try:
+        data = request.json or {}
 
-    el = oyuncu_eli_getir(int(data['chat_id']), int(data['user_id']))
-    if not el:
-        return jsonify({"success": False, "error": "El boş"})
+        chat_id = int(data.get("chat_id"))
+        user_id = int(data.get("user_id"))
 
-    taslar = [renk_normalize_et(t) for t in el if t is not None]
-    taslar = [t for t in taslar if t is not None]
+        el = oyuncu_eli_getir(chat_id, user_id)
+        if not el:
+            return jsonify({"success": False, "error": "El boş"})
 
-    yeni_el, puan = per_analiz_et_mantigi(taslar)
+        taslar = []
+        for t in el:
+            if t is None:
+                continue
+            t = renk_normalize_et(t)
+            if t is None:
+                continue
+            # 🔥 ek güvenlik
+            if "renk" in t and "sayi" in t:
+                taslar.append(t)
 
-    # 🔥 RENK GARANTİSİ
-    yeni_el = [renk_normalize_et(t) for t in yeni_el]
+        yeni_el, puan = per_analiz_et_mantigi(taslar)
+        yeni_el = [renk_normalize_et(t) for t in yeni_el if t is not None]
 
-    oyuncu_eli_guncelle(int(data['chat_id']), int(data['user_id']), yeni_el)
+        oyuncu_eli_guncelle(chat_id, user_id, yeni_el)
 
-    return jsonify({
-        "success": True,
-        "yeni_el": yeni_el,
-        "puan": puan
-    })
+        return jsonify({"success": True, "yeni_el": yeni_el, "puan": puan})
+
+    except Exception as e:
+        print("AUTO_SORT HATASI:", e)
+        return jsonify({"success": False, "error": str(e)}), 500
+
 @flask_app.route('/can_open', methods=['POST'])
 def can_open():
     data = request.json
