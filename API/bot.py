@@ -420,6 +420,64 @@ def renk_normalize_et(tas):
     return tas
 
 
+def tum_per_adaylarini_bul(el):
+    """
+    Eldeki tüm geçerli perleri (3-4 taşlık grup veya seri) üretir.
+    Joker sadece isOkey=True olan taşlardır.
+    """
+    adaylar = []
+
+    # 3 ve 4 uzunlukta tüm kombinasyonları dene
+    from itertools import combinations
+
+    for k in (3, 4, 5, 6, 7, 8):  # seri daha uzun olabileceği için
+        for comb in combinations(el, k):
+            grup = list(comb)
+            if per_gecerli_mi(grup):
+                adaylar.append(grup)
+
+    return adaylar
+def max_puanli_per_kombinasyonu(el):
+    adaylar = tum_per_adaylarini_bul(el)
+
+    # Her perin puanını hesapla
+    perler = [(per, per_puan_hesapla(per)) for per in adaylar]
+    perler.sort(key=lambda x: x[1], reverse=True)  # yüksek puanlıları öne al
+
+    best_score = 0
+    best_solution = []
+
+    def backtrack(i, used_ids, current, score):
+        nonlocal best_score, best_solution
+
+        if score > best_score:
+            best_score = score
+            best_solution = current[:]
+
+        if i >= len(perler):
+            return
+
+        for j in range(i, len(perler)):
+            per, puan = perler[j]
+
+            ids = [id(t) for t in per]
+            if any(x in used_ids for x in ids):
+                continue
+
+            for x in ids:
+                used_ids.add(x)
+
+            current.append(per)
+            backtrack(j + 1, used_ids, current, score + puan)
+
+            current.pop()
+            for x in ids:
+                used_ids.remove(x)
+
+    backtrack(0, set(), [], 0)
+    return best_solution, best_score
+
+
 async def katil(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
     chat_id = update.effective_chat.id
