@@ -327,54 +327,72 @@ def save_hand():
 
     temiz_el = []
     for tas in el:
-        # ✅ boş slotlar korunmalı
         if tas is None:
-            temiz_el.append(None)
+            temiz_el.append({"bos": True})
             continue
 
         if isinstance(tas, dict) and tas.get("bos") is True:
             temiz_el.append({"bos": True})
             continue
 
-        # ✅ normal taşları normalize et
         t2 = renk_normalize_et(tas)
-        temiz_el.append(t2)
+        if t2 and "renk" in t2 and "sayi" in t2:
+            temiz_el.append(t2)
+        else:
+            temiz_el.append({"bos": True})
 
     oyuncu_eli_guncelle(int(data['chat_id']), int(data['user_id']), temiz_el)
     return jsonify({"success": True})
 
 
+
 @flask_app.route('/auto_sort', methods=['POST'])
 def auto_sort():
-    try:
-        data = request.json or {}
+    data = request.json or {}
 
-        chat_id = int(data.get("chat_id"))
-        user_id = int(data.get("user_id"))
+    chat_id = int(data.get("chat_id"))
+    user_id = int(data.get("user_id"))
 
-        el = oyuncu_eli_getir(chat_id, user_id)
-        if not el:
-            return jsonify({"success": False, "error": "El boş"})
+    el = oyuncu_eli_getir(chat_id, user_id)
+    if not el:
+        return jsonify({"success": False, "error": "El boş"})
 
-        taslar = []
-        for t in el:
-            if t is None:
-                continue
+    # ✅ temiz taş listesi (per analizi için)
+    taslar = []
+    for t in el:
+        if not t or (isinstance(t, dict) and t.get("bos")):
+            continue
+        t2 = renk_normalize_et(t)
+        if t2 and "renk" in t2 and "sayi" in t2:
+            taslar.append(t2)
+
+    yeni_el, puan = per_analiz_et_mantigi(taslar)
+
+    # ✅ UI’ye gidecek el: placeholderları ve taşları doğru formatla
+    yeni_el_son = []
+    for t in yeni_el:
+        if t is None:
+            yeni_el_son.append({"bos": True})
+        elif isinstance(t, dict) and t.get("bos") is True:
+            yeni_el_son.append({"bos": True})
+        else:
             t2 = renk_normalize_et(t)
-            if t2 is not None:
-                taslar.append(t2)
-           
+            if t2 and "renk" in t2 and "sayi" in t2:
+                yeni_el_son.append(t2)
+            else:
+                yeni_el_son.append({"bos": True})
 
-        yeni_el, puan = per_analiz_et_mantigi(taslar)
-        yeni_el = [renk_normalize_et(t) for t in yeni_el if t is not None]
+    # ✅ el uzunluğu korunsun
+    ORJ_LEN = len(el)
+    if len(yeni_el_son) > ORJ_LEN:
+        yeni_el_son = yeni_el_son[:ORJ_LEN]
+    elif len(yeni_el_son) < ORJ_LEN:
+        yeni_el_son.extend([{"bos": True}] * (ORJ_LEN - len(yeni_el_son)))
 
-        oyuncu_eli_guncelle(chat_id, user_id, yeni_el)
+    oyuncu_eli_guncelle(chat_id, user_id, yeni_el_son)
 
-        return jsonify({"success": True, "yeni_el": yeni_el, "puan": puan})
+    return jsonify({"success": True, "yeni_el": yeni_el_son, "puan": puan})
 
-    except Exception as e:
-        print("AUTO_SORT HATASI:", e)
-        return jsonify({"success": False, "error": str(e)}), 500
 
 @flask_app.route('/can_open', methods=['POST'])
 def can_open():

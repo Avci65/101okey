@@ -264,58 +264,6 @@ function perPuanHesaplaTekGrup(grup) {
 }
 
 
-
-function perPuanHesaplaTekGrup(grup) {
-    if (!perGecerliMi(grup)) return 0;
-
-    const jokerler = grup.filter(t => t.isOkey);
-    const normalTaslar = grup.filter(t => !t.isOkey);
-
-    /* === GRUP PER === */
-    const sayilar = new Set(normalTaslar.map(t => t.sayi));
-    if (sayilar.size === 1) {
-        const sayi = normalTaslar[0].sayi;
-        return (normalTaslar.length + jokerler.length) * sayi;
-    }
-
-    /* === SERİ PER === */
-    const sirali = normalTaslar
-        .map(t => t.sayi)
-        .sort((a, b) => a - b);
-
-    let beklenen = sirali[0];
-    let toplamTas = normalTaslar.length + jokerler.length;
-    let puan = 0;
-
-    for (let i = 0; i < toplamTas; i++) {
-        puan += beklenen;
-        beklenen++;
-    }
-
-    return puan;
-}
-
-
-/* ================= PUAN HESABI ================= */
-function perPuaniniHesapla() {
-    let toplam = 0;
-    let geciciPer = [];
-
-    for (let i = 0; i <= mevcutEl.length; i++) {
-        const tas = mevcutEl[i] ?? null;
-
-        if (tas !== null) {
-            geciciPer.push(tas);
-        } else {
-            toplam += perPuanHesaplaTekGrup(geciciPer);
-            geciciPer = [];
-        }
-    }
-
-    document.getElementById("perPuani").innerText = toplam;
-    document.getElementById("puanBox").style.display = "block";
-}
-
 async function acabilirMiKontrolEt() {
     const puan = Number(document.getElementById("perPuani").innerText);
 
