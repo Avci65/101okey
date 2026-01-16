@@ -350,12 +350,10 @@ def auto_sort():
         for t in el:
             if t is None:
                 continue
-            t = renk_normalize_et(t)
-            if t is None:
-                continue
-            # 🔥 ek güvenlik
-            if "renk" in t and "sayi" in t:
-                taslar.append(t)
+            t2 = renk_normalize_et(t)
+            if t2 is not None:
+                taslar.append(t2)
+           
 
         yeni_el, puan = per_analiz_et_mantigi(taslar)
         yeni_el = [renk_normalize_et(t) for t in yeni_el if t is not None]
@@ -402,24 +400,56 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         reply_markup=InlineKeyboardMarkup(keyboard)
     )
 def renk_normalize_et(tas):
-    if not tas:
+    """
+    Taşı ASLA sırf renk tanınmadı diye silmez.
+    Sadece normalize etmeye çalışır.
+    """
+    if not tas or not isinstance(tas, dict):
         return None
 
     if 'renk' not in tas or 'sayi' not in tas:
-        return None  # bozuk taşı tamamen at
+        return None
 
-    renk = str(tas['renk']).lower()
+    # sayi hatalıysa da eleme
+    try:
+        tas["sayi"] = int(tas["sayi"])
+    except Exception:
+        return None
 
-    if 'kirmizi' in renk or 'kırmızı' in renk or 'red' in renk:
+    renk_raw = str(tas.get('renk', '')).strip().lower()
+
+    # Türkçe karakter temizleme
+    renk_raw = (
+        renk_raw.replace("ı", "i")
+                .replace("İ", "i")
+                .replace("ş", "s")
+                .replace("Ş", "s")
+                .replace("ğ", "g")
+                .replace("Ğ", "g")
+                .replace("ü", "u")
+                .replace("Ü", "u")
+                .replace("ö", "o")
+                .replace("Ö", "o")
+                .replace("ç", "c")
+                .replace("Ç", "c")
+    )
+
+    if 'kirmizi' in renk_raw or renk_raw == 'red':
         tas['renk'] = 'kirmizi'
-    elif 'mavi' in renk or 'blue' in renk:
+    elif 'mavi' in renk_raw or renk_raw == 'blue':
         tas['renk'] = 'mavi'
-    elif 'sari' in renk or 'yellow' in renk:
+    elif 'sari' in renk_raw or renk_raw == 'yellow':
         tas['renk'] = 'sari'
-    elif 'siyah' in renk or 'black' in renk:
+    elif 'siyah' in renk_raw or renk_raw == 'black':
         tas['renk'] = 'siyah'
     else:
-        return None  # sahte / bozuk
+        # 🔥 KRİTİK: bilinmeyen rengi SİLME
+        # Olduğu gibi bırak ama yine de çalışsın
+        tas['renk'] = renk_raw if renk_raw else 'kirmizi'
+
+    # Flagler garanti olsun
+    tas.setdefault("isOkey", False)
+    tas.setdefault("isFakeOkey", False)
 
     return tas
 
