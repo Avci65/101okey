@@ -7,6 +7,7 @@ from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, WebAppI
 from telegram.ext import ApplicationBuilder, CommandHandler, ContextTypes, CallbackQueryHandler
 from database import get_connection
 from database import deste_olustur
+from itertools import combinations
 # Veritabanı fonksiyonları
 from database import (
     oyunu_baslat_db, sira_kimde, sirayi_degistir, 
@@ -31,47 +32,40 @@ flask_app = Flask(__name__, template_folder=template_path)
 
 def per_gecerli_mi(grup):
     """
-    101 Okey kuralı:
-    - Joker sadece GERÇEK OKEY taşıdır (isOkey=True)
+    101 Okey:
+    - Joker SADECE gerçek okeydir (isOkey=True)
     - Sahte okey (isFakeOkey=True) joker değildir
     """
     if not grup or len(grup) < 3:
         return False
 
-    # Joker sadece isOkey
     jokerler = [t for t in grup if t and t.get("isOkey")]
     normal = [t for t in grup if t and not t.get("isOkey")]
 
     joker_sayisi = len(jokerler)
-
-    # Tüm taşlar joker olamaz (mantıksız)
     if len(normal) == 0:
         return False
 
-    # RENK veya SAYI eksikse per olmaz
-    if any(("renk" not in t or "sayi" not in t) for t in normal):
-        return False
-
-    # GRUP PER: aynı sayı, farklı renk
+    # Grup per kontrolü (aynı sayı, farklı renk)
     sayilar = {t["sayi"] for t in normal}
     if len(sayilar) == 1:
         renkler = [t["renk"] for t in normal]
-        # aynı renkten tekrar olamaz
         if len(set(renkler)) != len(renkler):
             return False
         return True
 
-    # SERİ PER: aynı renk, ardışık sayılar (joker boşluk doldurabilir)
+    # Seri per kontrolü (aynı renk, ardışık - joker boşluk doldurabilir)
     renkler = {t["renk"] for t in normal}
     if len(renkler) != 1:
         return False
 
-    sirali = sorted([t["sayi"] for t in normal])
+    sayilar = sorted(t["sayi"] for t in normal)
     eksik = 0
-    for i in range(1, len(sirali)):
-        fark = sirali[i] - sirali[i - 1]
+
+    for i in range(1, len(sayilar)):
+        fark = sayilar[i] - sayilar[i - 1]
         if fark == 0:
-            return False  # aynı sayı tekrar olamaz
+            return False
         if fark > 1:
             eksik += (fark - 1)
 
@@ -79,131 +73,118 @@ def per_gecerli_mi(grup):
 
 
 def per_analiz_et_mantigi(taslar):
-    """Taşları okeyi kullanarak en yüksek puanı alacak şekilde dizer."""
-    jokerler = [t for t in taslar if t.get("isOkey") or t.get("isFakeOkey")]
-    normal_taslar = [t for t in taslar if not (t.get("isOkey") or t.get("isFakeOkey"))]
-    
-    kullanilan_id = set() # Hangi taşlar perlere dahil edildi?
+    """
+    Diz mantığı (MAX PUAN):
+    - Tüm olası per adaylarını çıkar
+    - Taş çakışması olmadan kombinasyon dene (backtracking)
+    - En yüksek puanı veren per setini seç
+    """
+    # Joker: sadece gerçek okey
+    jokerler = [t for t in taslar if t.get("isOkey")]
+    normal_taslar = [t for t in taslar if not t.get("isOkey")]
+
+    # 1) Per adayları üret
+    adaylar = []
+    n = len(taslar)
+
+    # 3..8 arası kombinasyonları tara (per uzayabilir)
+    for k in range(3, min(9, n + 1)):
+        for comb in combinations(taslar, k):
+            per = list(comb)
+            if per_gecerli_mi(per):
+                puan = per_puan_hesapla(per)
+                if puan > 0:
+                    adaylar.append((per, puan))
+
+    # puanı yüksek olanları öne al
+    adaylar.sort(key=lambda x: x[1], reverse=True)
+
+    # 2) Backtracking ile maksimum seç
+    best_score = 0
+    best_solution = []
+
+    def backtrack(idx, used_ids, current_solution, current_score):
+        nonlocal best_score, best_solution
+
+        if current_score > best_score:
+            best_score = current_score
+            best_solution = current_solution[:]
+
+        if idx >= len(adaylar):
+            return
+
+        for j in range(idx, len(adaylar)):
+            per, puan = adaylar[j]
+            per_ids = [id(t) for t in per]
+
+            if any(x in used_ids for x in per_ids):
+                continue
+
+            # seç
+            for x in per_ids:
+                used_ids.add(x)
+            current_solution.append(per)
+
+            backtrack(j + 1, used_ids, current_solution, current_score + puan)
+
+            # geri al
+            current_solution.pop()
+            for x in per_ids:
+                used_ids.remove(x)
+
+    backtrack(0, set(), [], 0)
+
+    # 3) Best perleri tek bir listeye düz
     final_perler = []
+    used = set()
+    for per in best_solution:
+        final_perler.append(per)
+        for t in per:
+            used.add(id(t))
 
-    # --- A. SERİ PERLERİ BUL (Öncelikli) ---
-    renkler = ["kirmizi", "mavi", "siyah", "sari"]
-    for r in renkler:
-        renk_grubu = sorted([t for t in normal_taslar if t['renk'] == r], key=lambda x: x['sayi'])
-        i = 0
-        while i < len(renk_grubu):
-            gecici_per = [renk_grubu[i]]
-            j = i + 1
-            while j < len(renk_grubu):
-                # Ardışık mı yoksa arada jokerle dolacak boşluk mu var?
-                fark = renk_grubu[j]['sayi'] - gecici_per[-1]['sayi']
-                if fark == 1:
-                    gecici_per.append(renk_grubu[j])
-                    j += 1
-                elif 1 < fark <= (len(jokerler) + 1): # Boşluk jokerle dolabilir mi?
-                    # Bu basitleştirilmiş bir yaklaşımdır
-                    gecici_per.append(renk_grubu[j])
-                    j += 1
-                else:
-                    break
-            
-            if len(gecici_per) >= 2: # En az 2 taş varsa jokerle 3'e tamamlanabilir
-                if len(gecici_per) >= 3 or len(jokerler) > 0:
-                    # Per geçerli mi kontrol et
-                    # (Not: Burada jokerleri geçici olarak ekleyip test etmek gerekebilir)
-                    final_perler.append(gecici_per)
-                    for t in gecici_per: kullanilan_id.add(id(t))
-                    i = j
-                else: i += 1
-            else: i += 1
+    # 4) Kalan taşları sona ekle
+    kalan = [t for t in taslar if id(t) not in used]
 
-    # --- B. GRUP PERLERİ BUL (Kalanlardan) ---
-    kalan_taslar = [t for t in normal_taslar if id(t) not in kullanilan_id]
-    for s in range(1, 14):
-        ayni_sayilar = [t for t in kalan_taslar if t['sayi'] == s]
-        # Renkleri benzersiz yap
-        benzersiz_grup = []
-        gorulen_renkler = set()
-        for t in ayni_sayilar:
-            if t['renk'] not in gorulen_renkler:
-                benzersiz_grup.append(t)
-                gorulen_renkler.add(t['renk'])
-        
-        if len(benzersiz_grup) >= 3 or (len(benzersiz_grup) >= 2 and len(jokerler) > 0):
-            final_perler.append(benzersiz_grup)
-            for t in benzersiz_grup: kullanilan_id.add(id(t))
-
-    # --- C. JOKERLERİ DAĞIT VE ISTAKAYI OLUŞTUR ---
-    istaka = []
-    kullanilan_joker_sayisi = 0
-    toplam_puan = 0
-
+    # Flatten: perler + kalanlar
+    yeni_el = []
     for per in final_perler:
-        # Per 2 taşlıysa 1 joker ekle
-        if len(per) == 2 and kullanilan_joker_sayisi < len(jokerler):
-            per.append(jokerler[kullanilan_joker_sayisi])
-            kullanilan_joker_sayisi += 1
-        
-        # Puan hesapla
-        if per_gecerli_mi(per):
-            # Okeyli perlerde puan hesabı: Joker girdiği yerdeki taşın değerini alır
-            puan = sum(t['sayi'] for t in per if not (t.get("isOkey") or t.get("isFakeOkey")))
-            # Basit puan hesabı: Joker ortalama bir değer alır veya per mantığına göre eklenir
-            toplam_puan += puan 
-        
-        istaka.extend(per)
-        istaka.append(None) # Perler arası boşluk
+        yeni_el.extend(per)
+    yeni_el.extend(kalan)
 
-    # Kalan her şeyi sona ekle
-    kalanlar = [t for t in taslar if id(t) not in kullanilan_id and not (t.get("isOkey") or t.get("isFakeOkey"))]
-    # Kullanılmayan jokerleri de ekle
-    if kullanilan_joker_sayisi < len(jokerler):
-        kalanlar.extend(jokerler[kullanilan_joker_sayisi:])
-        
-    istaka.extend(kalanlar)
-    
-    # 30'a tamamla
-    while len(istaka) < 30:
-        istaka.append(None)
-        
-    return istaka[:30], toplam_puan
-def per_puan_hesapla(grup):
+    # 14'lük el ise uzunluk sabit kalsın
+    return yeni_el, best_score
+def per_puan_hesapla(per):
     """
-    101 Okey puan:
-    - Grup per: taş sayısı * sayı
-    - Seri per: taşların sayıları toplamı (joker boşluk doldurur)
-    Joker sadece gerçek okeydir.
+    Basit ve tutarlı puan hesabı:
+    - Grup per: len(per) * sayı
+    - Seri per: serinin sayıları toplamı (joker boşluğu doldurur)
+    Joker sadece isOkey.
     """
-    if not per_gecerli_mi(grup):
+    if not per_gecerli_mi(per):
         return 0
 
-    jokerler = [t for t in grup if t and t.get("isOkey")]
-    normal = [t for t in grup if t and not t.get("isOkey")]
+    jokerler = [t for t in per if t.get("isOkey")]
+    normal = [t for t in per if not t.get("isOkey")]
 
-    joker_sayisi = len(jokerler)
-    if len(normal) == 0:
+    if not normal:
         return 0
 
-    # GRUP PER
-    sayilar = {t["sayi"] for t in normal}
-    if len(sayilar) == 1:
-        return len(grup) * normal[0]["sayi"]
+    sayilar_set = {t["sayi"] for t in normal}
+    # Grup per
+    if len(sayilar_set) == 1:
+        return len(per) * normal[0]["sayi"]
 
-    # SERİ PER
-    normal_sayilar = sorted([t["sayi"] for t in normal])
+    # Seri per
+    normal_sayilar = sorted(t["sayi"] for t in normal)
     start = normal_sayilar[0]
     end = normal_sayilar[-1]
 
-    # Aradaki boşlukları joker dolduruyor farz edilir
-    toplam_uzunluk = (end - start + 1)
+    # Jokerler boşluk doldurur → seri uzunluğunu per uzunluğuna tamamla
+    seri_len = end - start + 1
+    if seri_len < len(per):
+        end += (len(per) - seri_len)
 
-    # seri uzunluğu grup uzunluğu olmalı: joker ile tamamla
-    if toplam_uzunluk < len(grup):
-        end += (len(grup) - toplam_uzunluk)
-
-    # start..end arası toplam
-    seri_toplam = sum(range(start, end + 1))
-    return seri_toplam
+    return sum(range(start, end + 1))
 
 
 def okey_belirle(gosterge):
