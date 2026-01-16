@@ -30,39 +30,53 @@ flask_app = Flask(__name__, template_folder=template_path)
 
 
 def per_gecerli_mi(grup):
-    """Bir grubun okey/sahte okey dahil per olup olmadığını denetler."""
-    if len(grup) < 3: 
+    """
+    101 Okey kuralı:
+    - Joker sadece GERÇEK OKEY taşıdır (isOkey=True)
+    - Sahte okey (isFakeOkey=True) joker değildir
+    """
+    if not grup or len(grup) < 3:
         return False
-    
-    # Okeyleri ve normal taşları ayır
-    okeyler = [t for t in grup if t.get("isOkey") or t.get("isFakeOkey")]
-    normal_taslar = [t for t in grup if not (t.get("isOkey") or t.get("isFakeOkey"))]
 
-    # Hepsi okeyse (nadir ama mümkün) geçerlidir
-    if not normal_taslar:
+    # Joker sadece isOkey
+    jokerler = [t for t in grup if t and t.get("isOkey")]
+    normal = [t for t in grup if t and not t.get("isOkey")]
+
+    joker_sayisi = len(jokerler)
+
+    # Tüm taşlar joker olamaz (mantıksız)
+    if len(normal) == 0:
+        return False
+
+    # RENK veya SAYI eksikse per olmaz
+    if any(("renk" not in t or "sayi" not in t) for t in normal):
+        return False
+
+    # GRUP PER: aynı sayı, farklı renk
+    sayilar = {t["sayi"] for t in normal}
+    if len(sayilar) == 1:
+        renkler = [t["renk"] for t in normal]
+        # aynı renkten tekrar olamaz
+        if len(set(renkler)) != len(renkler):
+            return False
         return True
 
-    # --- GRUP PER KONTROLÜ (Aynı sayı, farklı renkler) ---
-    sayi = normal_taslar[0]['sayi']
-    if all(t['sayi'] == sayi for t in normal_taslar):
-        renkler = {t['renk'] for t in normal_taslar}
-        # Farklı renk sayısı + okey sayısı >= 3 olmalı
-        return (len(renkler) + len(okeyler)) >= 3 and len(renkler) == len(normal_taslar)
+    # SERİ PER: aynı renk, ardışık sayılar (joker boşluk doldurabilir)
+    renkler = {t["renk"] for t in normal}
+    if len(renkler) != 1:
+        return False
 
-    # --- SERİ PER KONTROLÜ (Aynı renk, ardışık sayılar) ---
-    renk = normal_taslar[0]['renk']
-    if all(t['renk'] == renk for t in normal_taslar):
-        sayilar = sorted([t['sayi'] for t in normal_taslar])
-        # Sayılar arasındaki boşlukları okeyler doldurabiliyor mu?
-        bosluk_sayisi = 0
-        for i in range(len(sayilar) - 1):
-            fark = sayilar[i+1] - sayilar[i]
-            if fark == 0: return False # Aynı sayıdan iki tane seri perde olmaz
-            bosluk_sayisi += (fark - 1)
-        
-        return bosluk_sayisi <= len(okeyler)
+    sirali = sorted([t["sayi"] for t in normal])
+    eksik = 0
+    for i in range(1, len(sirali)):
+        fark = sirali[i] - sirali[i - 1]
+        if fark == 0:
+            return False  # aynı sayı tekrar olamaz
+        if fark > 1:
+            eksik += (fark - 1)
 
-    return False
+    return eksik <= joker_sayisi
+
 
 def per_analiz_et_mantigi(taslar):
     """Taşları okeyi kullanarak en yüksek puanı alacak şekilde dizer."""
@@ -153,6 +167,43 @@ def per_analiz_et_mantigi(taslar):
         istaka.append(None)
         
     return istaka[:30], toplam_puan
+def per_puan_hesapla(grup):
+    """
+    101 Okey puan:
+    - Grup per: taş sayısı * sayı
+    - Seri per: taşların sayıları toplamı (joker boşluk doldurur)
+    Joker sadece gerçek okeydir.
+    """
+    if not per_gecerli_mi(grup):
+        return 0
+
+    jokerler = [t for t in grup if t and t.get("isOkey")]
+    normal = [t for t in grup if t and not t.get("isOkey")]
+
+    joker_sayisi = len(jokerler)
+    if len(normal) == 0:
+        return 0
+
+    # GRUP PER
+    sayilar = {t["sayi"] for t in normal}
+    if len(sayilar) == 1:
+        return len(grup) * normal[0]["sayi"]
+
+    # SERİ PER
+    normal_sayilar = sorted([t["sayi"] for t in normal])
+    start = normal_sayilar[0]
+    end = normal_sayilar[-1]
+
+    # Aradaki boşlukları joker dolduruyor farz edilir
+    toplam_uzunluk = (end - start + 1)
+
+    # seri uzunluğu grup uzunluğu olmalı: joker ile tamamla
+    if toplam_uzunluk < len(grup):
+        end += (len(grup) - toplam_uzunluk)
+
+    # start..end arası toplam
+    seri_toplam = sum(range(start, end + 1))
+    return seri_toplam
 
 
 def okey_belirle(gosterge):
@@ -201,19 +252,32 @@ def discard_tile():
 
 @flask_app.route('/draw_tile', methods=['POST'])
 def draw_tile():
-    # Oyuncu zaten çektiyse tekrar çekemez
-    if oyun_verisi_getir(chat_id).get("cekildi"):
-     return jsonify({"success": False, "error": "Önce taş atmalısın"})
+    data = request.json or {}
 
-    data = request.json
-    chat_id, user_id = data['chat_id'], data['user_id']
-    
-    # Veritabanından sıradaki taşı çek
-    tas = tas_cek_db(int(chat_id), int(user_id))
-    
-    if tas:
-        return jsonify({"success": True, "tas": renk_normalize_et(tas)})
-    return jsonify({"success": False, "error": "Deste bitti veya sıra sende değil!"})
+    # Gerekli veriler
+    try:
+        chat_id = int(data.get('chat_id'))
+        user_id = int(data.get('user_id'))
+    except (TypeError, ValueError):
+        return jsonify({"success": False, "error": "Geçersiz chat_id/user_id"}), 400
+
+    oyun = oyun_verisi_getir(chat_id)
+    if not oyun:
+        return jsonify({"success": False, "error": "Oyun bulunamadı"}), 404
+
+    # Oyuncu zaten çektiyse tekrar çekemez
+    if oyun.get("cekildi"):
+        return jsonify({"success": False, "error": "Önce taş atmalısın"}), 400
+
+    tas = tas_cek_db(chat_id, user_id)
+
+    if not tas:
+        return jsonify({"success": False, "error": "Destede taş kalmadı"}), 400
+
+    # normalize fonksiyonun yoksa direkt tas gönder
+    # (UI zaten renkleri render ediyor)
+    return jsonify({"success": True, "tas": tas})
+
 @flask_app.route('/')
 def index():
     return render_template('index.html')
@@ -376,8 +440,9 @@ async def katil(update: Update, context: ContextTypes.DEFAULT_TYPE):
         # 4️⃣ SAHTE OKEYLERE KİMLİK VER
         for tas in deste:
             if tas.get("isFakeOkey"):
-                tas["renk"] = okey_tas["renk"]
-                tas["sayi"] = okey_tas["sayi"]
+                continue
+            if tas["renk"] == okey_tas["renk"] and tas["sayi"] == okey_tas["sayi"]:
+                tas["isOkey"] = True
 
         # 5️⃣ OYUNCU ELİ
         hand = [deste.pop() for _ in range(22)]
