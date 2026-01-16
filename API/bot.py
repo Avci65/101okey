@@ -90,16 +90,19 @@ def per_analiz_et_mantigi(taslar):
     - Tüm olası per adaylarını çıkar
     - Taş çakışması olmadan kombinasyon dene (backtracking)
     - En yüksek puanı veren per setini seç
+    - Perlerin arasına None koy (UI perleri ayırsın)
+    - El uzunluğu korunur
+    Joker: SADECE gerçek okey (isOkey=True)
     """
-    # Joker: sadece gerçek okey
-    jokerler = [t for t in taslar if t.get("isOkey")]
-    normal_taslar = [t for t in taslar if not t.get("isOkey")]
+
+    # Orijinal el boyunu korumak için
+    orj_len = len(taslar)
 
     # 1) Per adayları üret
     adaylar = []
     n = len(taslar)
 
-    # 3..8 arası kombinasyonları tara (per uzayabilir)
+    # 3..8 arası kombinasyonları tara (seri uzayabilir)
     for k in range(3, min(9, n + 1)):
         for comb in combinations(taslar, k):
             per = list(comb)
@@ -129,6 +132,7 @@ def per_analiz_et_mantigi(taslar):
             per, puan = adaylar[j]
             per_ids = [id(t) for t in per]
 
+            # taş çakışması varsa geç
             if any(x in used_ids for x in per_ids):
                 continue
 
@@ -146,24 +150,37 @@ def per_analiz_et_mantigi(taslar):
 
     backtrack(0, set(), [], 0)
 
-    # 3) Best perleri tek bir listeye düz
-    final_perler = []
+    # 3) Best perleri topla ve kullanılan taşları işaretle
     used = set()
+    final_perler = []
     for per in best_solution:
         final_perler.append(per)
         for t in per:
             used.add(id(t))
 
-    # 4) Kalan taşları sona ekle
+    # 4) Kalan taşlar
     kalan = [t for t in taslar if id(t) not in used]
 
-    # Flatten: perler + kalanlar
+    # 5) UI perleri ayırsın diye perlerin arasına None separator koy
     yeni_el = []
-    for per in final_perler:
+    for idx, per in enumerate(final_perler):
         yeni_el.extend(per)
+        # per bitti -> ayırıcı
+        if idx != len(final_perler) - 1:
+            yeni_el.append(None)
+
+    # perler varsa, perlerden sonra da 1 boşluk
+    if final_perler:
+        yeni_el.append(None)
+
     yeni_el.extend(kalan)
 
-    # 14'lük el ise uzunluk sabit kalsın
+    # 6) El uzunluğunu koru
+    if len(yeni_el) > orj_len:
+        yeni_el = yeni_el[:orj_len]
+    elif len(yeni_el) < orj_len:
+        yeni_el.extend([None] * (orj_len - len(yeni_el)))
+
     return yeni_el, best_score
 def per_puan_hesapla(per):
     """
