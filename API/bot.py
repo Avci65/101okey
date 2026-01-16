@@ -85,24 +85,11 @@ def per_gecerli_mi(grup):
 
 
 def per_analiz_et_mantigi(taslar):
-    """
-    Diz mantığı (MAX PUAN):
-    - Tüm olası per adaylarını çıkar
-    - Taş çakışması olmadan kombinasyon dene (backtracking)
-    - En yüksek puanı veren per setini seç
-    - Perlerin arasına None koy (UI perleri ayırsın)
-    - El uzunluğu korunur
-    Joker: SADECE gerçek okey (isOkey=True)
-    """
-
-    # Orijinal el boyunu korumak için
     orj_len = len(taslar)
 
-    # 1) Per adayları üret
     adaylar = []
     n = len(taslar)
 
-    # 3..8 arası kombinasyonları tara (seri uzayabilir)
     for k in range(3, min(9, n + 1)):
         for comb in combinations(taslar, k):
             per = list(comb)
@@ -111,46 +98,37 @@ def per_analiz_et_mantigi(taslar):
                 if puan > 0:
                     adaylar.append((per, puan))
 
-    # puanı yüksek olanları öne al
     adaylar.sort(key=lambda x: x[1], reverse=True)
 
-    # 2) Backtracking ile maksimum seç
     best_score = 0
     best_solution = []
 
     def backtrack(idx, used_ids, current_solution, current_score):
         nonlocal best_score, best_solution
-
         if current_score > best_score:
             best_score = current_score
             best_solution = current_solution[:]
-
         if idx >= len(adaylar):
             return
 
         for j in range(idx, len(adaylar)):
             per, puan = adaylar[j]
             per_ids = [id(t) for t in per]
-
-            # taş çakışması varsa geç
             if any(x in used_ids for x in per_ids):
                 continue
 
-            # seç
             for x in per_ids:
                 used_ids.add(x)
             current_solution.append(per)
 
             backtrack(j + 1, used_ids, current_solution, current_score + puan)
 
-            # geri al
             current_solution.pop()
             for x in per_ids:
                 used_ids.remove(x)
 
     backtrack(0, set(), [], 0)
 
-    # 3) Best perleri topla ve kullanılan taşları işaretle
     used = set()
     final_perler = []
     for per in best_solution:
@@ -158,28 +136,26 @@ def per_analiz_et_mantigi(taslar):
         for t in per:
             used.add(id(t))
 
-    # 4) Kalan taşlar
     kalan = [t for t in taslar if id(t) not in used]
 
-    # 5) UI perleri ayırsın diye perlerin arasına None separator koy
+    # ✅ Separator: None yerine DB-safe placeholder
+    BOS = {"bos": True}
+
     yeni_el = []
     for idx, per in enumerate(final_perler):
         yeni_el.extend(per)
-        # per bitti -> ayırıcı
         if idx != len(final_perler) - 1:
-            yeni_el.append(None)
+            yeni_el.append(BOS)
 
-    # perler varsa, perlerden sonra da 1 boşluk
     if final_perler:
-        yeni_el.append(None)
+        yeni_el.append(BOS)
 
     yeni_el.extend(kalan)
 
-    # 6) El uzunluğunu koru
     if len(yeni_el) > orj_len:
         yeni_el = yeni_el[:orj_len]
     elif len(yeni_el) < orj_len:
-        yeni_el.extend([None] * (orj_len - len(yeni_el)))
+        yeni_el.extend([BOS] * (orj_len - len(yeni_el)))
 
     return yeni_el, best_score
 def per_puan_hesapla(per):
