@@ -216,6 +216,7 @@ function perGecerliMi(grup) {
     if (renkler.size !== 1) return false;
 
     const sirali = normalTaslar.map(t => t.sayi).sort((a, b) => a - b);
+    if (sirali[sirali.length - 1] - sirali[0] + 1 > 13) return false;
 
     let eksik = 0;
     for (let i = 1; i < sirali.length; i++) {
@@ -268,34 +269,28 @@ function perPuaniniHesapla() {
   let toplam = 0;
   let grup = [];
 
-  // eldeki 30 slotu sırayla dolaş, boşta kes
   for (const tas of mevcutEl) {
-    if (!tas || tas.bos === true) {
-      // grup bitti
-      if (grup.length >= 3) {
-        toplam += perPuanHesaplaTekGrup(grup);
-      }
+    // sadece DİZ algoritmasının koyduğu gerçek boşluk ayırıcı
+    if (tas && tas.bos === true) {
+      if (grup.length >= 3) toplam += perPuanHesaplaTekGrup(grup);
       grup = [];
-    } else {
-      grup.push(tas);
+      continue;
     }
+
+    // null ise taş değil -> PUAN HESABINA DAHİL ETME ama grup bölme de yapma
+    if (!tas) continue;
+
+    grup.push(tas);
   }
 
   // son grup
-  if (grup.length >= 3) {
-    toplam += perPuanHesaplaTekGrup(grup);
-  }
+  if (grup.length >= 3) toplam += perPuanHesaplaTekGrup(grup);
 
-  const puanBox = document.getElementById("puanBox");
-  const puanSpan = document.getElementById("perPuani");
-
-  puanSpan.innerText = toplam;
-
-  // puan kutusunu göster
-  puanBox.style.display = "block";
-
+  document.getElementById("perPuani").innerText = toplam;
+  document.getElementById("puanBox").style.display = "block";
   return toplam;
 }
+
 
 
 async function acabilirMiKontrolEt() {
