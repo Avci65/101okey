@@ -95,7 +95,7 @@
 </head>
 
 <body>
-    <div class="header">🎴 AVCİ 101 OKEY PLUS</div>
+    <div class="header">🎴 AVCİ 101 OKEY PLUS :S </div>
 <div style="display:flex; gap:20px; margin-bottom:10px;">
     <div>
     <div id="gostergeBox" class="tas tas-mini"></div>
@@ -263,6 +263,40 @@ function perPuanHesaplaTekGrup(grup) {
     return puan;
 }
 
+/* ================= PER PUANI HESAPLA (TÜM EL) ================= */
+function perPuaniniHesapla() {
+  let toplam = 0;
+  let grup = [];
+
+  // eldeki 30 slotu sırayla dolaş, boşta kes
+  for (const tas of mevcutEl) {
+    if (!tas || tas.bos === true) {
+      // grup bitti
+      if (grup.length >= 3) {
+        toplam += perPuanHesaplaTekGrup(grup);
+      }
+      grup = [];
+    } else {
+      grup.push(tas);
+    }
+  }
+
+  // son grup
+  if (grup.length >= 3) {
+    toplam += perPuanHesaplaTekGrup(grup);
+  }
+
+  const puanBox = document.getElementById("puanBox");
+  const puanSpan = document.getElementById("perPuani");
+
+  puanSpan.innerText = toplam;
+
+  // puan kutusunu göster
+  puanBox.style.display = "block";
+
+  return toplam;
+}
+
 
 async function acabilirMiKontrolEt() {
     const puan = Number(document.getElementById("perPuani").innerText);
@@ -382,72 +416,78 @@ async function eliKaydet() {
 }
 
 /* ================= UI ================= */
+/* ================= UI ================= */
 function arayuzuGuncelle() {
-    const istaka = document.getElementById("istaka");
-    istaka.innerHTML = "";
+  const istaka = document.getElementById("istaka");
+  istaka.innerHTML = "";
 
-    mevcutEl.forEach((tas, idx) => {
-        const d = document.createElement("div");
-        let yazi = "";
-        let extraClass = "";
+  mevcutEl.forEach((tas, idx) => {
+    const d = document.createElement("div");
 
-        if (tas) {
-            if (tas.isFakeOkey) {
-                // Sahte Okey ise "A" yazdır ve özel stilini ver
-                yazi = "A";
-                extraClass = "fake-okey";
-            } else {
-                // Normal taş veya Gerçek Okey ise sayısını yazdır
-                yazi = tas.sayi;
-                // Eğer API'den isOkey: true gelmişse altın çerçeve ekle
-                if (tas.isOkey === true) {
-                    extraClass = "okey-tas";
-                }
-            }
+    const bosMu = (!tas || tas.bos === true);
+
+    let yazi = "";
+    let extraClass = "";
+
+    if (!bosMu) {
+      if (tas.isFakeOkey) {
+        yazi = "A";
+        extraClass = "fake-okey";
+      } else {
+        yazi = tas.sayi;
+        if (tas.isOkey === true) extraClass = "okey-tas";
+      }
+    }
+
+    d.className = `tas ${bosMu ? "bos" : renkFormatla(tas.renk)} ${seciliIdx === idx ? "secili" : ""} ${extraClass}`;
+    d.innerText = yazi;
+
+    d.onclick = async () => {
+      // boş taşta işlem yapma
+      if (bosMu && seciliIdx === null) return;
+
+      // seçim işlemi
+      if (seciliIdx === null && !bosMu) {
+        seciliIdx = idx;
+        arayuzuGuncelle();
+        return;
+      }
+
+      // seçili taş tekrar tıklanırsa atma
+      if (seciliIdx === idx && !bosMu) {
+        const onay = confirm("Bu taşı atmak istiyor musun?");
+        if (!onay) return;
+
+        const res = await fetch("/discard_tile", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ user_id: user.id, chat_id: chat_id, index: idx })
+        });
+
+        if ((await res.json()).success) {
+          mevcutEl[idx] = null;
+          seciliIdx = null;
+          arayuzuGuncelle();
+          perPuaniniHesapla();
+          acabilirMiKontrolEt();
         }
+        return;
+      }
 
-        // CSS sınıflarını birleştir
-        d.className = `tas ${tas ? renkFormatla(tas.renk) : "bos"} ${seciliIdx === idx ? "secili" : ""} ${extraClass}`;
-        d.innerText = yazi;
+      // swap
+      if (seciliIdx !== null) {
+        [mevcutEl[idx], mevcutEl[seciliIdx]] = [mevcutEl[seciliIdx], mevcutEl[idx]];
+        seciliIdx = null;
 
-        // Tıklama işlemleri (Taş taşıma veya Atma)
-        d.onclick = async () => {
-            if (seciliIdx === null && tas) {
-                seciliIdx = idx;
-                arayuzuGuncelle();
-                return;
-            }
+        await eliKaydet();
+        arayuzuGuncelle();
+        perPuaniniHesapla();
+        acabilirMiKontrolEt();
+      }
+    };
 
-            if (seciliIdx === idx && tas) {
-                const onay = confirm("Bu taşı atmak istiyor musun?");
-                if (!onay) return;
-                const res = await fetch("/discard_tile", {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({ user_id: user.id, chat_id: chat_id, index: idx })
-                });
-                if ((await res.json()).success) {
-                    mevcutEl[idx] = null;
-                    seciliIdx = null;
-                    arayuzuGuncelle();
-                    perPuaniniHesapla();
-                    acabilirMiKontrolEt();
-                }
-                return;
-            }
-
-            if (seciliIdx !== null) {
-                [mevcutEl[idx], mevcutEl[seciliIdx]] = [mevcutEl[seciliIdx], mevcutEl[idx]];
-                seciliIdx = null;
-                await eliKaydet();
-                arayuzuGuncelle();
-                perPuaniniHesapla();
-                acabilirMiKontrolEt();
-            }
-        };
-
-        istaka.appendChild(d);
-    });
+    istaka.appendChild(d);
+  });
 }
 
 
