@@ -281,7 +281,7 @@ def get_hand():
 
     conn = get_connection()
     cur = conn.cursor()
-    cur.execute("SELECT players, gosterge, okey FROM games WHERE chat_id = %s", (chat_id,))
+    cur.execute("SELECT players, gosterge, okey, discard FROM games WHERE chat_id = %s", (chat_id,))
     row = cur.fetchone()
     cur.close()
     conn.close()
@@ -289,34 +289,47 @@ def get_hand():
     if not row:
         return jsonify({"error": "Oyun bulunamadı"}), 404
 
-    players, gosterge, okey = row
+    players, gosterge, okey, discard = row
     el = players.get(str(user_id), [])
 
     yeni_el = []
     for tas in el:
-        if not tas:
+        # boş slot
+        if not tas or (isinstance(tas, dict) and tas.get("bos")):
             yeni_el.append(None)
             continue
 
-        # 1. OKEY KONTROLÜ: Rengi ve sayısı okey ile aynı olan normal taş
-        is_okey = (
-            okey and 
-            tas.get("renk") == okey.get("renk") and 
-            tas.get("sayi") == okey.get("sayi") and 
-            not tas.get("isFakeOkey")
-        )
+        # normalize et (renk/sayi garanti)
+        tas = renk_normalize_et(tas)
 
-        # 2. SAHTE OKEY KONTROLÜ: Direkt veritabanındaki flag'e bakıyoruz
-        is_fake = tas.get("isFakeOkey", False)
+        # SAHTE OKEY kontrol
+        is_fake = bool(tas.get("isFakeOkey", False))
+
+        # GERÇEK OKEY kontrol (sahte değilse ve okey ile aynıysa)
+        is_okey = (
+            bool(okey) and
+            tas.get("renk") == okey.get("renk") and
+            tas.get("sayi") == okey.get("sayi") and
+            not is_fake
+        )
 
         tas["isOkey"] = is_okey
         tas["isFakeOkey"] = is_fake
+
         yeni_el.append(tas)
+
+    # discard'ı da normalize et
+    discard_out = None
+    if discard and isinstance(discard, dict):
+        discard_out = renk_normalize_et(discard)
+    elif discard is None:
+        discard_out = None
 
     return jsonify({
         "el": yeni_el,
         "gosterge": gosterge,
-        "okey": okey
+        "okey": okey,
+        "discard": discard_out
     })
 
 
@@ -349,46 +362,61 @@ def save_hand():
 
 @flask_app.route('/auto_sort', methods=['POST'])
 def auto_sort():
-    data = request.json or {}
-    chat_id = int(data.get("chat_id"))
-    user_id = int(data.get("user_id"))
+    try:
+        data = request.json or {}
+        chat_id = int(data.get("chat_id"))
+        user_id = int(data.get("user_id"))
 
-    el = oyuncu_eli_getir(chat_id, user_id) #
-    if not el:
-        return jsonify({"success": False, "error": "El boş"})
+        el = oyuncu_eli_getir(chat_id, user_id)
+        if not el:
+            return jsonify({"success": False, "error": "El boş"})
 
-    # 1. Analiz için sadece gerçek taşları ayıkla
-    taslar = []
-    for t in el:
-        if t and isinstance(t, dict) and not t.get("bos"):
+        # 1) Analize girecek taşları ayıkla
+        taslar = []
+        for t in el:
+            if not t:
+                continue
+            if isinstance(t, dict) and t.get("bos"):
+                continue
+
             normalized = renk_normalize_et(t)
             if not normalized.get("bos"):
                 taslar.append(normalized)
 
-    # 2. Algoritmayı çalıştır
-    yeni_el_listesi, puan = per_analiz_et_mantigi(taslar) #
+        if not taslar:
+            return jsonify({"success": False, "error": "Elde analiz edilecek taş yok"})
 
-    # 3. UI için listeyi temizle ve eksikleri "bos" ile doldur
-    final_el = []
-    for t in yeni_el_listesi:
-        final_el.append(renk_normalize_et(t))
+        # 2) Per algoritmasını çalıştır
+        yeni_el_listesi, puan = per_analiz_et_mantigi(taslar)
 
-    # 4. Orijinal istaka uzunluğunu koru (Genelde 30 slot)
-    ISTAKA_BOYUTU = 30 
-    if len(final_el) < ISTAKA_BOYUTU:
-        final_el.extend([{"bos": True}] * (ISTAKA_BOYUTU - len(final_el)))
-    else:
-        final_el = final_el[:ISTAKA_BOYUTU]
+        # 3) UI için taşları temizle (bos True olanlar None yerine bos dict olabilir)
+        final_el = []
+        for t in yeni_el_listesi:
+            final_el.append(renk_normalize_et(t))
 
-    # Veritabanını güncelle
-    oyuncu_eli_guncelle(chat_id, user_id, final_el) #
+        # 4) 30 slot’a tamamla / kes
+        ISTAKA_BOYUTU = 30
+        if len(final_el) < ISTAKA_BOYUTU:
+            final_el.extend([{"bos": True}] * (ISTAKA_BOYUTU - len(final_el)))
+        else:
+            final_el = final_el[:ISTAKA_BOYUTU]
 
-    return jsonify({
-        "success": True, 
-        "yeni_el": final_el, 
-        "puan": puan
-    })
+        # 5) DB güncelle
+        oyuncu_eli_guncelle(chat_id, user_id, final_el)
 
+        return jsonify({
+            "success": True,
+            "yeni_el": final_el,
+            "puan": puan
+        })
+
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return jsonify({
+            "success": False,
+            "error": str(e)
+        }), 500
 
 @flask_app.route('/can_open', methods=['POST'])
 def can_open():

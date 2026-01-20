@@ -332,22 +332,56 @@ async function taslariYukle() {
 }
 
 
-/* ================= OTO DİZ ================= */
+/* ================= OTO DİZ (DEBUG) ================= */
 async function otomatikDiz() {
+  try {
+    console.log("🪄 DİZ basıldı");
+
+    const payload = { user_id: user.id, chat_id };
+    console.log("➡️ Gönderilen payload:", payload);
+
     const res = await fetch('/auto_sort', {
-        method: 'POST',
-        headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({ user_id: user.id, chat_id })
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
     });
 
-    const data = await res.json();
-    if (data.success) {
-        mevcutEl = data.yeni_el;
-        arayuzuGuncelle();
-        perPuaniniHesapla();
-        acabilirMiKontrolEt();
+    console.log("📌 Status:", res.status);
+
+    // JSON gelmezse diye önce text okuyup logluyoruz
+    const raw = await res.text();
+    console.log("📌 Response raw:", raw);
+
+    let data;
+    try {
+      data = JSON.parse(raw);
+    } catch (e) {
+      console.error("❌ JSON parse hatası:", e);
+      alert("❌ DİZ: Sunucu JSON dönmedi! Console'a bak.");
+      return;
     }
+
+    // success false ise kullanıcıya bildir
+    if (!data.success) {
+      console.error("❌ DİZ başarısız:", data);
+      alert("❌ DİZ başarısız: " + (data.error || "Bilinmeyen hata"));
+      return;
+    }
+
+    // başarılı
+    console.log("✅ DİZ başarılı, puan:", data.puan);
+
+    mevcutEl = data.yeni_el;
+    arayuzuGuncelle();
+    perPuaniniHesapla();
+    acabilirMiKontrolEt();
+
+  } catch (err) {
+    console.error("❌ DİZ catch hata:", err);
+    alert("❌ DİZ sırasında hata oluştu. Console'a bak.");
+  }
 }
+
 
 /* ================= KAYDET ================= */
 async function eliKaydet() {
