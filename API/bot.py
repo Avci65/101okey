@@ -85,12 +85,16 @@ def per_gecerli_mi(grup):
 
 
 def per_analiz_et_mantigi(taslar):
-    orj_len = len(taslar)
-
-    adaylar = []
+    """
+    Tüm eldeki taşları analiz eder, en yüksek puanlı per kombinasyonlarını bulur
+    ve taşları perler arasına boşluk koyarak dizer.
+    """
     n = len(taslar)
+    adaylar = []
 
-    for k in range(3, min(9, n + 1)):
+    # 1. ADIM: Tüm olası per adaylarını (3'lüden 13'lüye kadar) bul
+    # 101 Okey kurallarına göre (per_gecerli_mi fonksiyonunu kullanarak)
+    for k in range(3, min(14, n + 1)):
         for comb in combinations(taslar, k):
             per = list(comb)
             if per_gecerli_mi(per):
@@ -98,64 +102,60 @@ def per_analiz_et_mantigi(taslar):
                 if puan > 0:
                     adaylar.append((per, puan))
 
+    # Puanı yüksek olan adayları başa al (Backtracking hızı için)
     adaylar.sort(key=lambda x: x[1], reverse=True)
 
     best_score = 0
     best_solution = []
 
+    # 2. ADIM: Backtracking (Geriye Dönük İzleme) ile çakışmayan en iyi seti bul
     def backtrack(idx, used_ids, current_solution, current_score):
         nonlocal best_score, best_solution
+        
+        # Eğer mevcut puan daha iyiyse kaydet
         if current_score > best_score:
             best_score = current_score
             best_solution = current_solution[:]
-        if idx >= len(adaylar):
-            return
 
         for j in range(idx, len(adaylar)):
             per, puan = adaylar[j]
+            # Taşın ID'sini kullanarak aynı fiziksel taşın birden fazla perde girmesini önle
             per_ids = [id(t) for t in per]
+            
             if any(x in used_ids for x in per_ids):
                 continue
 
+            # Taşı kullanıldı olarak işaretle
             for x in per_ids:
                 used_ids.add(x)
             current_solution.append(per)
 
+            # Bir sonraki adayları dene
             backtrack(j + 1, used_ids, current_solution, current_score + puan)
 
+            # Geri al (Backtrack)
             current_solution.pop()
             for x in per_ids:
                 used_ids.remove(x)
 
+    # Algoritmayı başlat
     backtrack(0, set(), [], 0)
 
-    used = set()
-    final_perler = []
-    for per in best_solution:
-        final_perler.append(per)
-        for t in per:
-            used.add(id(t))
-
-    kalan = [t for t in taslar if id(t) not in used]
-
-    # ✅ Separator: None yerine DB-safe placeholder
+    # 3. ADIM: Sonuç Listesini Oluşturma (İstaka Dizilimi)
     BOS = {"bos": True}
-
     yeni_el = []
-    for idx, per in enumerate(final_perler):
+    final_used_ids = set()
+
+    # Perleri aralarına boşluk koyarak ekle
+    for per in best_solution:
         yeni_el.extend(per)
-        if idx != len(final_perler) - 1:
-            yeni_el.append(BOS)
+        for t in per:
+            final_used_ids.add(id(t))
+        yeni_el.append(BOS) # Per bitince boşluk bırak
 
-    if final_perler:
-        yeni_el.append(BOS)
-
-    yeni_el.extend(kalan)
-
-    if len(yeni_el) > orj_len:
-        yeni_el = yeni_el[:orj_len]
-    elif len(yeni_el) < orj_len:
-        yeni_el.extend([BOS] * (orj_len - len(yeni_el)))
+    # Perlere girmeyen "boşta kalan" taşları sona ekle
+    kalanlar = [t for t in taslar if id(t) not in final_used_ids]
+    yeni_el.extend(kalanlar)
 
     return yeni_el, best_score
 def per_puan_hesapla(per):
@@ -349,49 +349,44 @@ def save_hand():
 @flask_app.route('/auto_sort', methods=['POST'])
 def auto_sort():
     data = request.json or {}
-
     chat_id = int(data.get("chat_id"))
     user_id = int(data.get("user_id"))
 
-    el = oyuncu_eli_getir(chat_id, user_id)
+    el = oyuncu_eli_getir(chat_id, user_id) #
     if not el:
         return jsonify({"success": False, "error": "El boş"})
 
-    # ✅ temiz taş listesi (per analizi için)
+    # 1. Analiz için sadece gerçek taşları ayıkla
     taslar = []
     for t in el:
-        if not t or (isinstance(t, dict) and t.get("bos")):
-            continue
-        t2 = renk_normalize_et(t)
-        if t2 and "renk" in t2 and "sayi" in t2:
-            taslar.append(t2)
+        if t and isinstance(t, dict) and not t.get("bos"):
+            normalized = renk_normalize_et(t)
+            if not normalized.get("bos"):
+                taslar.append(normalized)
 
-    yeni_el, puan = per_analiz_et_mantigi(taslar)
+    # 2. Algoritmayı çalıştır
+    yeni_el_listesi, puan = per_analiz_et_mantigi(taslar) #
 
-    # ✅ UI’ye gidecek el: placeholderları ve taşları doğru formatla
-    yeni_el_son = []
-    for t in yeni_el:
-        if t is None:
-            yeni_el_son.append({"bos": True})
-        elif isinstance(t, dict) and t.get("bos") is True:
-            yeni_el_son.append({"bos": True})
-        else:
-            t2 = renk_normalize_et(t)
-            if t2 and "renk" in t2 and "sayi" in t2:
-                yeni_el_son.append(t2)
-            else:
-                yeni_el_son.append({"bos": True})
+    # 3. UI için listeyi temizle ve eksikleri "bos" ile doldur
+    final_el = []
+    for t in yeni_el_listesi:
+        final_el.append(renk_normalize_et(t))
 
-    # ✅ el uzunluğu korunsun
-    ORJ_LEN = len(el)
-    if len(yeni_el_son) > ORJ_LEN:
-        yeni_el_son = yeni_el_son[:ORJ_LEN]
-    elif len(yeni_el_son) < ORJ_LEN:
-        yeni_el_son.extend([{"bos": True}] * (ORJ_LEN - len(yeni_el_son)))
+    # 4. Orijinal istaka uzunluğunu koru (Genelde 30 slot)
+    ISTAKA_BOYUTU = 30 
+    if len(final_el) < ISTAKA_BOYUTU:
+        final_el.extend([{"bos": True}] * (ISTAKA_BOYUTU - len(final_el)))
+    else:
+        final_el = final_el[:ISTAKA_BOYUTU]
 
-    oyuncu_eli_guncelle(chat_id, user_id, yeni_el_son)
+    # Veritabanını güncelle
+    oyuncu_eli_guncelle(chat_id, user_id, final_el) #
 
-    return jsonify({"success": True, "yeni_el": yeni_el_son, "puan": puan})
+    return jsonify({
+        "success": True, 
+        "yeni_el": final_el, 
+        "puan": puan
+    })
 
 
 @flask_app.route('/can_open', methods=['POST'])
@@ -428,60 +423,44 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         reply_markup=InlineKeyboardMarkup(keyboard)
     )
 def renk_normalize_et(tas):
-    """
-    Taşı ASLA sırf renk tanınmadı diye silmez.
-    Sadece normalize etmeye çalışır.
-    """
     if not tas:
-        return None
-    if isinstance(tas,dict) and tas.get("bos") is True:
-        return {"bos":True}
-    if 'renk' not in tas or 'sayi' not in tas:
-        return None
+        return {"bos": True}
+    
+    # Eğer zaten boş işaretliyse dokunma
+    if isinstance(tas, dict) and tas.get("bos"):
+        return {"bos": True}
 
-    # sayi hatalıysa da eleme
+    # Temel veri kontrolü
+    if not isinstance(tas, dict) or 'sayi' not in tas or 'renk' not in tas:
+        return {"bos": True}
+
+    # Sayıyı garantiye al
     try:
         tas["sayi"] = int(tas["sayi"])
-    except Exception:
-        return None
+    except (ValueError, TypeError):
+        return {"bos": True}
 
+    # Renk isimlerini standartlaştır (JS tarafındaki CSS sınıflarıyla uyum için)
     renk_raw = str(tas.get('renk', '')).strip().lower()
+    
+    # Türkçe karakter dönüşümü
+    tr_map = str.maketrans("ıişğüöç", "iisguoc")
+    renk_raw = renk_raw.translate(tr_map)
 
-    # Türkçe karakter temizleme
-    renk_raw = (
-        renk_raw.replace("ı", "i")
-                .replace("İ", "i")
-                .replace("ş", "s")
-                .replace("Ş", "s")
-                .replace("ğ", "g")
-                .replace("Ğ", "g")
-                .replace("ü", "u")
-                .replace("Ü", "u")
-                .replace("ö", "o")
-                .replace("Ö", "o")
-                .replace("ç", "c")
-                .replace("Ç", "c")
-    )
-
-    if 'kirmizi' in renk_raw or renk_raw == 'red':
+    if 'kirmizi' in renk_raw or 'red' in renk_raw:
         tas['renk'] = 'kirmizi'
-    elif 'mavi' in renk_raw or renk_raw == 'blue':
+    elif 'mavi' in renk_raw or 'blue' in renk_raw:
         tas['renk'] = 'mavi'
-    elif 'sari' in renk_raw or renk_raw == 'yellow':
+    elif 'sari' in renk_raw or 'yellow' in renk_raw:
         tas['renk'] = 'sari'
-    elif 'siyah' in renk_raw or renk_raw == 'black':
+    elif 'siyah' in renk_raw or 'black' in renk_raw:
         tas['renk'] = 'siyah'
-    else:
-        # 🔥 KRİTİK: bilinmeyen rengi SİLME
-        # Olduğu gibi bırak ama yine de çalışsın
-        tas['renk'] = renk_raw if renk_raw else 'kirmizi'
-
-    # Flagler garanti olsun
+    
+    # Bayrakları (flags) garanti altına al
     tas.setdefault("isOkey", False)
     tas.setdefault("isFakeOkey", False)
-
+    
     return tas
-
 
 def tum_per_adaylarini_bul(el):
     """
