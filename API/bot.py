@@ -281,7 +281,12 @@ def get_hand():
 
     conn = get_connection()
     cur = conn.cursor()
-    cur.execute("SELECT players, gosterge, okey, discard FROM games WHERE chat_id = %s", (chat_id,))
+
+    # discard'ı da alıyoruz (ORTA taşı)
+    cur.execute(
+        "SELECT players, gosterge, okey, discard FROM games WHERE chat_id = %s",
+        (chat_id,)
+    )
     row = cur.fetchone()
     cur.close()
     conn.close()
@@ -296,34 +301,48 @@ def get_hand():
     for tas in el:
         # boş slot
         if not tas or (isinstance(tas, dict) and tas.get("bos")):
-            yeni_el.append(None)
+            yeni_el.append({"bos": True})
             continue
 
-        # normalize et (renk/sayi garanti)
+        if not isinstance(tas, dict):
+            yeni_el.append({"bos": True})
+            continue
+
+        # normalize
         tas = renk_normalize_et(tas)
 
-        # SAHTE OKEY kontrol
-        is_fake = bool(tas.get("isFakeOkey", False))
+        # --- SAHTE OKEY MANTIĞI (FINAL) ---
+        # Sahte okey "A" bu elde SADECE okey taşının aynısıdır.
+        # Joker değildir.
+        if tas.get("isFakeOkey") and okey:
+            tas["renk"] = okey.get("renk")
+            tas["sayi"] = int(okey.get("sayi"))
 
-        # GERÇEK OKEY kontrol (sahte değilse ve okey ile aynıysa)
+        # --- GERÇEK OKEY MANTIĞI ---
+        # Gerçek okey taşı: rengi+sayı okey ile aynı olan ve sahte olmayan taşlar
         is_okey = (
-            bool(okey) and
-            tas.get("renk") == okey.get("renk") and
-            tas.get("sayi") == okey.get("sayi") and
-            not is_fake
+            bool(okey)
+            and tas.get("renk") == okey.get("renk")
+            and int(tas.get("sayi")) == int(okey.get("sayi"))
+            and not tas.get("isFakeOkey")
         )
 
-        tas["isOkey"] = is_okey
-        tas["isFakeOkey"] = is_fake
+        tas["isOkey"] = bool(is_okey)
+        tas["isFakeOkey"] = bool(tas.get("isFakeOkey", False))
 
         yeni_el.append(tas)
 
-    # discard'ı da normalize et
+    # discard normalize
     discard_out = None
     if discard and isinstance(discard, dict):
         discard_out = renk_normalize_et(discard)
-    elif discard is None:
-        discard_out = None
+
+        # discard sahte okey ise yine okey taşı gibi göster
+        if discard_out.get("isFakeOkey") and okey:
+            discard_out["renk"] = okey.get("renk")
+            discard_out["sayi"] = int(okey.get("sayi"))
+            discard_out["isOkey"] = False
+            discard_out["isFakeOkey"] = True
 
     return jsonify({
         "el": yeni_el,
@@ -364,44 +383,74 @@ def save_hand():
 def auto_sort():
     try:
         data = request.json or {}
+
         chat_id = int(data.get("chat_id"))
         user_id = int(data.get("user_id"))
 
+        # Eldeki taşları al
         el = oyuncu_eli_getir(chat_id, user_id)
         if not el:
             return jsonify({"success": False, "error": "El boş"})
 
-        # 1) Analize girecek taşları ayıkla
+        # Okey taşını DB'den al (sahte okeyi normalize etmek için)
+        conn = get_connection()
+        cur = conn.cursor()
+        cur.execute("SELECT okey FROM games WHERE chat_id = %s", (chat_id,))
+        okey_row = cur.fetchone()
+        cur.close()
+        conn.close()
+
+        okey = okey_row[0] if okey_row else None
+
+        # 1) sadece gerçek taşları ayıkla
         taslar = []
         for t in el:
             if not t:
                 continue
             if isinstance(t, dict) and t.get("bos"):
                 continue
+            if not isinstance(t, dict):
+                continue
 
             normalized = renk_normalize_et(t)
+
+            # SAHTE OKEY: bu elde okey taşının aynısı olsun
+            if normalized.get("isFakeOkey") and okey:
+                normalized["renk"] = okey.get("renk")
+                normalized["sayi"] = int(okey.get("sayi"))
+                normalized["isOkey"] = False
+
             if not normalized.get("bos"):
                 taslar.append(normalized)
 
         if not taslar:
-            return jsonify({"success": False, "error": "Elde analiz edilecek taş yok"})
+            return jsonify({"success": False, "error": "Analiz edilecek taş yok"})
 
-        # 2) Per algoritmasını çalıştır
+        # 2) Per algoritması
         yeni_el_listesi, puan = per_analiz_et_mantigi(taslar)
 
-        # 3) UI için taşları temizle (bos True olanlar None yerine bos dict olabilir)
+        # 3) UI için normalize + flag koru
         final_el = []
         for t in yeni_el_listesi:
-            final_el.append(renk_normalize_et(t))
+            t2 = renk_normalize_et(t)
 
-        # 4) 30 slot’a tamamla / kes
+            # sahte okey per içinde de aynı mantıkta kalsın
+            if isinstance(t2, dict) and t2.get("isFakeOkey") and okey:
+                t2["renk"] = okey.get("renk")
+                t2["sayi"] = int(okey.get("sayi"))
+                t2["isOkey"] = False
+                t2["isFakeOkey"] = True
+
+            final_el.append(t2)
+
+        # 4) 30 slot garanti
         ISTAKA_BOYUTU = 30
         if len(final_el) < ISTAKA_BOYUTU:
             final_el.extend([{"bos": True}] * (ISTAKA_BOYUTU - len(final_el)))
         else:
             final_el = final_el[:ISTAKA_BOYUTU]
 
-        # 5) DB güncelle
+        # 5) Kaydet
         oyuncu_eli_guncelle(chat_id, user_id, final_el)
 
         return jsonify({
@@ -413,10 +462,7 @@ def auto_sort():
     except Exception as e:
         import traceback
         traceback.print_exc()
-        return jsonify({
-            "success": False,
-            "error": str(e)
-        }), 500
+        return jsonify({"success": False, "error": str(e)}), 500
 
 @flask_app.route('/can_open', methods=['POST'])
 def can_open():
