@@ -84,76 +84,77 @@ def per_gecerli_mi(grup):
     return eksik <= joker_sayisi
 
 
+from itertools import combinations
+
 def per_analiz_et_mantigi(taslar):
     """
-    Tüm eldeki taşları analiz eder, en yüksek puanlı per kombinasyonlarını bulur
-    ve taşları perler arasına boşluk koyarak dizer.
+    Eldeki taşları analiz eder, en yüksek puanlı geçerli per kombinasyonlarını bulur.
     """
     n = len(taslar)
     adaylar = []
 
-    # 1. ADIM: Tüm olası per adaylarını (3'lüden 13'lüye kadar) bul
-    # 101 Okey kurallarına göre (per_gecerli_mi fonksiyonunu kullanarak)
+    # 1. Adım: Tüm geçerli per adaylarını tespit et (3'lüden başlayarak)
+    # n + 1 sınırı eldeki toplam taş sayısına göre dinamik ayarlanır
     for k in range(3, min(14, n + 1)):
         for comb in combinations(taslar, k):
             per = list(comb)
-            if per_gecerli_mi(per):
+            # bot.py içindeki mevcut geçerlilik kontrolünü kullanır
+            if per_gecerli_mi(per): 
                 puan = per_puan_hesapla(per)
                 if puan > 0:
                     adaylar.append((per, puan))
 
-    # Puanı yüksek olan adayları başa al (Backtracking hızı için)
+    # Yüksek puanlı perleri önce değerlendirmek algoritma hızını artırır
     adaylar.sort(key=lambda x: x[1], reverse=True)
 
     best_score = 0
     best_solution = []
 
-    # 2. ADIM: Backtracking (Geriye Dönük İzleme) ile çakışmayan en iyi seti bul
+    # 2. Adım: Çakışmayan en iyi kombinasyonu bulmak için Backtracking
     def backtrack(idx, used_ids, current_solution, current_score):
         nonlocal best_score, best_solution
         
-        # Eğer mevcut puan daha iyiyse kaydet
         if current_score > best_score:
             best_score = current_score
             best_solution = current_solution[:]
 
         for j in range(idx, len(adaylar)):
             per, puan = adaylar[j]
-            # Taşın ID'sini kullanarak aynı fiziksel taşın birden fazla perde girmesini önle
+            # id(t) kullanarak aynı fiziksel taşın farklı perlerde tekrarını önleriz
             per_ids = [id(t) for t in per]
             
             if any(x in used_ids for x in per_ids):
                 continue
 
-            # Taşı kullanıldı olarak işaretle
+            # Seçilen perdeki taşları 'kullanıldı' olarak işaretle
             for x in per_ids:
                 used_ids.add(x)
             current_solution.append(per)
 
-            # Bir sonraki adayları dene
+            # Bir sonraki per adayına geç
             backtrack(j + 1, used_ids, current_solution, current_score + puan)
 
-            # Geri al (Backtrack)
+            # Geri dön ve işaretlemeyi kaldır (Backtrack)
             current_solution.pop()
             for x in per_ids:
                 used_ids.remove(x)
 
-    # Algoritmayı başlat
+    # Analizi başlat
     backtrack(0, set(), [], 0)
 
-    # 3. ADIM: Sonuç Listesini Oluşturma (İstaka Dizilimi)
+    # 3. Adım: İstaka yerleşimini düzenle
     BOS = {"bos": True}
     yeni_el = []
     final_used_ids = set()
 
-    # Perleri aralarına boşluk koyarak ekle
+    # Bulunan en iyi perleri aralarına birer boşluk koyarak ekle
     for per in best_solution:
         yeni_el.extend(per)
         for t in per:
             final_used_ids.add(id(t))
-        yeni_el.append(BOS) # Per bitince boşluk bırak
+        yeni_el.append(BOS)
 
-    # Perlere girmeyen "boşta kalan" taşları sona ekle
+    # Per grubuna dahil olamayan taşları sona ekle
     kalanlar = [t for t in taslar if id(t) not in final_used_ids]
     yeni_el.extend(kalanlar)
 
