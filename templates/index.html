@@ -331,43 +331,34 @@ async function taslariYukle() {
     perPuaniniHesapla();
 }
 
-
-/* ================= OTO DİZ (DEBUGLU) ================= */
 async function otomatikDiz() {
   try {
-    console.log("🪄 DİZ basıldı");
+    const BASE = window.location.origin;
 
     const payload = {
       user_id: user.id,
       chat_id: chat_id
     };
-    console.log("➡️ payload:", payload);
 
-    const res = await fetch('/auto_sort', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+    console.log("🪄 DİZ basıldı", payload);
+
+    const res = await fetch(`${BASE}/auto_sort`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload)
     });
 
     console.log("📌 Status:", res.status);
 
     const raw = await res.text();
-    console.log("📌 Response raw:", raw);
+    console.log("📌 Raw:", raw);
 
-    let data;
-    try {
-      data = JSON.parse(raw);
-    } catch (e) {
-      alert("❌ AUTO_SORT JSON dönmedi, console'a bak");
-      return;
-    }
+    const data = JSON.parse(raw);
 
     if (!data.success) {
       alert("❌ DİZ başarısız: " + (data.error || "Bilinmeyen hata"));
       return;
     }
-
-    console.log("✅ DİZ başarılı");
 
     mevcutEl = data.yeni_el;
     arayuzuGuncelle();
@@ -375,8 +366,8 @@ async function otomatikDiz() {
     acabilirMiKontrolEt();
 
   } catch (err) {
-    console.error("❌ DİZ JS HATASI:", err);
-    alert("❌ DİZ sırasında JS hatası oluştu");
+    console.error("❌ DİZ JS HATA:", err);
+    alert("❌ DİZ JS HATA:\n" + (err?.message || err));
   }
 }
 
